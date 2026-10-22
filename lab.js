@@ -3,9 +3,9 @@
    ============================================================ */
 const $ = id => document.getElementById(id);
 const out = $('out'), cmd = $('cmd');
-const CH = CHAPTER, TASKS = CH.tasks;
+const CH = CHAPTERS.find(c=>c.id === document.body.dataset.chapter) || CHAPTERS[0], TASKS = CH.tasks;
 HOST = CH.host;
-let idx = 0, done = new Set(), revealed = false, status = null, history = [], hPos = 0, finished = false;
+let idx = 0, done = new Set(), revealed = false, status = null, cmdHist = [], hPos = 0, finished = false;
 let dataColl = CH.coll || null;
 const KEY = CH.key;
 function save(){ try { localStorage.setItem(KEY, JSON.stringify({ idx, done:[...done], finished })); } catch(_){} }
@@ -17,7 +17,7 @@ function banner(){
   line('Current Mongosh Log ID:\t' + oidHex(), 'dim');
   line('Connecting to:\t\tmongodb+srv://&lt;credentials&gt;@' + CH.cluster + '/', 'dim');
   line('Using MongoDB:\t\t8.0.4\nUsing Mongosh:\t\t2.3.8', 'dim');
-  line('\nType the answer to the question on the left. Enter runs it, Shift+Enter adds a line.\nType <span class="pr">help</span> for commands, <span class="pr">cls</span> to clear.\n', 'dim');
+  line('\nType your answer at the prompt. Enter runs it, Shift+Enter adds a line.\nType <span class="pr">help</span> for commands, <span class="pr">cls</span> to clear.\n', 'dim');
 }
 function replayTo(i){
   S = CH.init ? CH.init() : freshState();
@@ -25,10 +25,34 @@ function replayTo(i){
   flashIds.clear();
 }
 
-function renderDots(){
+function doneOf(c){
+  if (c === CH) return done;
+  try { const st = JSON.parse(localStorage.getItem(c.key) || 'null'); return new Set(st && st.done || []); } catch(_){ return new Set(); }
+}
+function topicsOf(c){
   const groups = [];
-  TASKS.forEach((t,i)=>{ const last = groups[groups.length-1]; if (last && last.name === t.group) last.items.push(i); else groups.push({ name:t.group, items:[i] }); });
-  $('dots').innerHTML = groups.map(g=>`<div class="grp"><small>${g.name}</small><div>${g.items.map(i=>`<button type="button" class="dot${done.has(i)?' done':''}${i===idx&&!finished?' cur':''}" data-i="${i}" title="Q${i+1}: ${esc(TASKS[i].title)}">${i+1}</button>`).join('')}</div></div>`).join('');
+  c.tasks.forEach((t,i)=>{ const last = groups[groups.length-1]; if (last && last.name === t.group) last.items.push(i); else groups.push({ name:t.group, items:[i] }); });
+  return groups;
+}
+function renderOutline(){
+  const html = CHAPTERS.map(c=>{
+    const on = c === CH, d = doneOf(c);
+    const head = `<span class="chap-num">${c.num}</span><span class="chap-title">${esc(c.title)}<small>${esc(c.story)}</small></span><span class="chap-count">${d.size}/${c.tasks.length}</span>`;
+    const topics = topicsOf(c).map(g=>{
+      const n = g.items.filter(i=>d.has(i)).length;
+      const items = g.items.map(i=>{
+        const cls = `qi${d.has(i)?' done':''}${on && i===idx && !finished?' cur':''}`;
+        const inner = `<span class="st">${d.has(i)?'✓':i+1}</span><span>${esc(c.tasks[i].title)}</span>`;
+        return on ? `<button type="button" class="${cls}" data-i="${i}"${i===idx&&!finished?' aria-current="step"':''}>${inner}</button>`
+                  : `<a class="${cls}" href="${c.href}#q${i+1}">${inner}</a>`;
+      }).join('');
+      return `<div class="topic">${esc(g.name)}<span>${n}/${g.items.length}</span></div>${items}`;
+    }).join('');
+    return `<section class="chap${on?' on':''}">${on ? `<div class="chap-head">${head}</div>` : `<a class="chap-head" href="${c.href}">${head}</a>`}${topics}</section>`;
+  }).join('');
+  $('outline').innerHTML = `<div class="ol-label">Course outline</div>${html}`;
+  $('progText').textContent = `Chapter ${CH.num} · ${done.size} of ${TASKS.length} complete`;
+  $('progBar').style.width = (100*done.size/TASKS.length) + '%';
 }
 function renderQ(){
   const q = $('q');
@@ -44,7 +68,7 @@ function renderQ(){
   else if (status) st = `<div class="status ${status.kind}">${status.html}</div>`;
   else st = `<div class="status wait">Type your answer in the shell and press Enter.</div>`;
   q.innerHTML = `
-    <div class="qhead"><span class="tag">${t.group}</span><span class="qn">Question ${idx+1} of ${TASKS.length}</span></div>
+    <div class="qhead"><span class="tag">${esc(t.group)}</span><span class="qn">Chapter ${CH.num} · Question ${idx+1} of ${TASKS.length}</span></div>
     <h1>${t.title}</h1>
     ${t.story ? `<p class="story">${t.story}</p>` : ''}
     <p class="ask">${t.ask}</p>
@@ -64,7 +88,7 @@ function renderNav(){
   nx.textContent = idx === TASKS.length-1 ? 'Finish ✓' : 'Next →';
   nx.disabled = finished;
   nx.classList.toggle('go', done.has(idx) && !finished);
-  $('crumb').textContent = finished ? 'Complete' : `Q${idx+1} / ${TASKS.length} · ${TASKS[idx].group}`;
+  $('crumb').textContent = finished ? `Chapter ${CH.num} complete` : `${CH.title} › ${TASKS[idx].group} › Q${idx+1}`;
 }
 function renderData(){
   const d = S.dbs[S.cur];
@@ -81,7 +105,7 @@ function renderData(){
   const cell = v => v === undefined ? '' : (v instanceof ObjectId ? '…' + v.h.slice(-6) : esc(typeof v === 'object' ? R(v,0,false)[0] : typeof v === 'string' ? (/^\s*-?\d+(\.\d+)?\s*$/.test(v) ? `"${v}"` : v) : typeof v === 'number' && Math.abs(v) >= 1e15 ? v.toExponential().replace('e+','e') : String(v)));
   body.innerHTML = `<table><tr>${cols.map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${c.docs.map(x=>`<tr class="${flashIds.has(canon(x._id))?'flash':''}">${cols.map(k=>`<td class="${k==='_id'?'id':''}">${cell(x[k])}</td>`).join('')}</tr>`).join('')}</table>`;
 }
-function renderAll(){ renderDots(); renderQ(); renderNav(); renderData(); setPrompt(); }
+function renderAll(){ renderOutline(); renderQ(); renderNav(); renderData(); setPrompt(); }
 
 function goTo(i, rebuild){
   const advancing = i === idx + 1 && done.has(idx) && !rebuild;
@@ -95,14 +119,15 @@ function goTo(i, rebuild){
     line(`── Question ${i+1} ──`, 'sep');
   }
   flashIds.clear();
-  save(); renderAll(); cmd.focus();
+  try { history.replaceState(null, '', '#q' + (i+1)); } catch(_){}
+  save(); renderAll(); scrollOutline(); cmd.focus();
 }
 
 function run(src){
   const code = src.trim();
   line(`<span class="pr">${esc(HOST+' '+S.cur+'>')}</span> ${esc(src.replace(/\n/g,'\n'))}`);
   if (!code) return;
-  history.push(src); hPos = history.length;
+  cmdHist.push(src); hPos = cmdHist.length;
   if (/^(cls|clear)\s*;?$/.test(code)){ out.innerHTML = ''; return; }
   flashIds.clear();
   const before = cloneState(S);
@@ -198,17 +223,24 @@ cmd.addEventListener('keydown', e=>{
   } else if (e.key === 'Tab'){
     e.preventDefault(); cmd.setRangeText('  ', cmd.selectionStart, cmd.selectionEnd, 'end');
   } else if (e.key === 'ArrowUp' && !cmd.value.slice(0, cmd.selectionStart).includes('\n')){
-    if (hPos > 0){ e.preventDefault(); hPos--; cmd.value = history[hPos]; grow(); }
+    if (hPos > 0){ e.preventDefault(); hPos--; cmd.value = cmdHist[hPos]; grow(); }
   } else if (e.key === 'ArrowDown' && !cmd.value.slice(cmd.selectionEnd).includes('\n')){
-    if (hPos < history.length){ e.preventDefault(); hPos++; cmd.value = history[hPos] || ''; grow(); }
+    if (hPos < cmdHist.length){ e.preventDefault(); hPos++; cmd.value = cmdHist[hPos] || ''; grow(); }
   } else if (e.key === 'l' && e.ctrlKey){ e.preventDefault(); out.innerHTML = ''; }
 });
 $('shell').addEventListener('click', e=>{ if (!window.getSelection().toString() && e.target.tagName !== 'BUTTON') cmd.focus(); });
 $('clr').onclick = ()=>{ out.innerHTML = ''; cmd.focus(); };
-$('dots').addEventListener('click', e=>{ const b = e.target.closest('.dot'); if (b) goTo(+b.dataset.i, true); });
+function scrollOutline(){ const b = $('outline').querySelector('.qi.cur'); if (b) b.scrollIntoView({ block:'nearest' }); }
+function drawer(open){ $('outline').classList.toggle('open', open); $('scrim').classList.toggle('on', open); $('menu').setAttribute('aria-expanded', open); }
+$('outline').addEventListener('click', e=>{ const b = e.target.closest('button.qi'); if (b){ drawer(false); goTo(+b.dataset.i, true); } });
+$('menu').onclick = ()=> drawer(!$('outline').classList.contains('open'));
+$('scrim').onclick = ()=> drawer(false);
+document.addEventListener('keydown', e=>{ if (e.key === 'Escape') drawer(false); });
+window.addEventListener('resize', ()=>{ out.scrollTop = out.scrollHeight; if (innerWidth > 1240) drawer(false); });
 $('dchips').addEventListener('click', e=>{ const b = e.target.closest('.chip'); if (b){ dataColl = b.dataset.c; renderData(); } });
 $('dtog').onclick = ()=>{ const d = $('data'); d.classList.toggle('min'); $('dtog').textContent = d.classList.contains('min') ? 'Show' : 'Hide'; };
 $('prev').onclick = ()=>{ if (finished){ finished = false; goTo(TASKS.length-1, true); } else if (idx > 0) goTo(idx-1, true); };
+$('conn').textContent = 'mongodb+srv://' + CH.cluster + ' · Cluster0';
 $('next').onclick = ()=>{
   if (idx === TASKS.length-1){ finished = true; save(); renderAll(); return; }
   goTo(idx+1, !done.has(idx));
@@ -230,6 +262,7 @@ document.addEventListener('keydown', e=>{ if ((e.key === 'f' || e.key === 'F') &
 
 /* boot */
 load();
-const startAt = idx;
+const hq = location.hash.match(/^#q(\d+)$/);
+const startAt = hq ? Math.min(Math.max(+hq[1]-1, 0), TASKS.length-1) : idx;
 idx = -1;
 goTo(startAt, true);

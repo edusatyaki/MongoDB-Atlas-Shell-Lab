@@ -279,7 +279,8 @@ const CH02_TASKS = [
     note:'<code>{ ok: 1, dropped: \'LusciousJewels\' }</code>. Thank you!' }
 ];
 
-const CHAPTER = {
+(window.CHAPTERS = window.CHAPTERS || []).push({
+  id: 'ch02', num: '02', title: 'CRUD Operations', href: 'index.html', story: 'Luscious Jewels',
   key: 'lj-atlas-shell-lab-v1',
   host: 'Atlas atlas-lj7k2q-shard-0 [primary]',
   cluster: 'lusciousjewels.lj7k2q.mongodb.net',
@@ -290,4 +291,4 @@ const CHAPTER = {
     text: `You ran all ${CH02_TASKS.length} CRUD operations for Luscious Jewels on the Atlas shell.`,
     note: 'Create → Read → Update → Delete → Drop → Capped → Upsert.'
   }
-};
+});

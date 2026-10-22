@@ -3,54 +3,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mission Mongo Lab</title>
+<title>Query &amp; Update Operators · Atlas Shell Lab</title>
 <link rel="stylesheet" href="lab.css">
-<style>
-/* Mission Mongo: deep-space theme over the shared lab styles */
-:root{ --ink:#0B1026; --ink2:#1E2440; --gold:#6B4FBB; --goldbg:#F2EEFF; --mint:#3DDC97; --green:#13795B; --mintbg:#E2F8EF; }
-.top{background:linear-gradient(100deg,#0B1026 0%,#1B1840 55%,#33215C 100%)}
-.brand span{color:#C9C3E8}
-.grp small{color:#C9C3E8}
-.story b{color:#4B2F9E}
-</style>
 </head>
-<body>
+<body data-chapter="ch03">
 <div id="app">
   <header class="top">
-    <div class="brand">
-      <svg class="gem" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="9" fill="#3DDC97"/><ellipse cx="16" cy="16" rx="15" ry="5" fill="none" stroke="#C9C3E8" stroke-width="1.6" transform="rotate(-20 16 16)"/><circle cx="12.5" cy="13" r="2" fill="#13795B"/></svg>
-      <div><b>Mission Mongo · Atlas Shell Lab</b><span>Lesson 03 · Update &amp; Query Operators</span></div>
-    </div>
-    <nav class="chapters" aria-label="Chapters"><a href="index.html">Ch 02 · CRUD</a><a class="on" href="chapter03.html">Ch 03 · Operators</a></nav>
-    <nav class="dots" id="dots" aria-label="Questions"></nav>
+    <button class="menu" id="menu" type="button" aria-controls="outline" aria-expanded="false">☰ Outline</button>
+    <a class="brand" href="index.html">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2.3c-.2-.4-.5-.7-.6-1.1-.2.4-.4.8-.7 1.1C9.6 4.6 5.7 8.9 6.2 13.9c.4 3.5 2.6 5.8 4.9 6.9l.4 2.9h1.1l.3-2.9c2.4-1.1 4.6-3.6 4.9-6.9.4-5-3.5-9.3-5.2-11.6z" fill="#00ED64"/><path d="M12 3.5v18" stroke="#001E2B" stroke-width=".9"/></svg>
+      <span><b>Atlas Shell Lab</b><small>MongoDB practice in the mongosh shell</small></span>
+    </a>
+    <div class="prog" aria-live="polite"><span id="progText"></span><div class="bar"><i id="progBar"></i></div></div>
     <button class="fsbtn" id="fs" type="button">⛶ Full screen</button>
   </header>
 
-  <main>
-    <section class="q" id="q" aria-live="polite"></section>
-    <section class="right">
-      <div class="shell" id="shell">
-        <div class="shbar"><span class="live"></span><span class="t">MONGOSH</span><span class="conn">mongodb+srv://missionmongo.mm3k9x.mongodb.net · Cluster0</span><button id="clr" type="button">Clear</button></div>
-        <div class="out" id="out"></div>
-        <div class="inrow"><span class="pr" id="prompt"></span><textarea id="cmd" rows="1" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="mongosh input"></textarea></div>
-      </div>
-      <div class="data" id="data">
-        <div class="dhead"><b>Data</b><span class="crumbs" id="dcrumb"></span><span class="chips" id="dchips"></span><span class="sp"></span><button class="mini" id="dtog" type="button">Hide</button></div>
-        <div class="dbody" id="dbody"></div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="bot">
-    <button class="nav" id="prev" type="button">← Back</button>
-    <span class="crumb" id="crumb"></span>
-    <span class="credit"><b>Innovation in Education</b><i>—</i>Satyaki Das</span>
-    <button class="nav" id="next" type="button">Next →</button>
-    <span class="hint">Enter runs · Shift+Enter new line · ↑↓ history</span>
-  </footer>
+  <div class="frame">
+    <nav class="outline" id="outline" aria-label="Course outline"></nav>
+    <div class="work">
+      <main class="panes">
+        <section class="q" id="q" aria-live="polite"></section>
+        <section class="right">
+          <div class="shell" id="shell">
+            <div class="shbar"><span class="live"></span><span class="t">MONGOSH</span><span class="conn" id="conn"></span><button id="clr" type="button">Clear</button></div>
+            <div class="out" id="out"></div>
+            <div class="inrow"><span class="pr" id="prompt"></span><textarea id="cmd" rows="1" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="mongosh input"></textarea></div>
+          </div>
+          <div class="data" id="data">
+            <div class="dhead"><b>Data</b><span class="crumbs" id="dcrumb"></span><span class="chips" id="dchips"></span><span class="sp"></span><button class="mini" id="dtog" type="button">Hide</button></div>
+            <div class="dbody" id="dbody"></div>
+          </div>
+        </section>
+      </main>
+      <footer class="bot">
+        <button class="nav" id="prev" type="button">← Previous</button>
+        <span class="crumb" id="crumb"></span>
+        <span class="credit"><b>Innovation in Education</b><i>·</i>Satyaki Das</span>
+        <span class="hint">Enter runs · Shift+Enter new line · ↑↓ history</span>
+        <button class="nav" id="next" type="button">Next →</button>
+      </footer>
+    </div>
+  </div>
+  <div class="scrim" id="scrim"></div>
 </div>
 
 <script src="engine.js"></script>
+<script src="ch02.js"></script>
 <script src="ch03.js"></script>
 <script src="lab.js"></script>
 </body>

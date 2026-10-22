@@ -246,7 +246,8 @@ const CH03_TASKS = [
     note:'Same <code>_id</code>, completely new body. Mission complete!' }
 ];
 
-const CHAPTER = {
+(window.CHAPTERS = window.CHAPTERS || []).push({
+  id: 'ch03', num: '03', title: 'Update & Query Operators', href: 'chapter03.html', story: 'Mission Mongo',
   key: 'mission-mongo-ch03-v1',
   host: 'Atlas atlas-mm3k9x-shard-0 [primary]',
   cluster: 'missionmongo.mm3k9x.mongodb.net',
@@ -264,4 +265,4 @@ const CHAPTER = {
     text: `You ran all ${CH03_TASKS.length} query and update operators from Mission Mongo.`,
     note: 'Comparison → Logical → Array → Regex → Field, Array, Positional and Date updates → Replace.'
   }
-};
+});
