@@ -16,7 +16,8 @@ A browser simulator of the MongoDB Atlas shell (mongosh) for practising MongoDB,
 - **Real shell behaviour.** Commands run against an in-browser data store and print mongosh-style output, including `insertedId`, `matchedCount` and red server errors.
 - **Checked by effect, not by text.** Your command is compared with the model answer run on the same data, so formatting doesn't matter, but the operator the question teaches does.
 - **Targeted hints** for common mistakes: numbers saved as text, `matchedCount: 0`, a missing `{ upsert: true }`, the right result with the wrong operator.
-- **Course outline** sidebar lists every chapter, topic and question, always expanded, with progress ticks. Click any question to jump there; links like `chapter03.html#q13` open a question directly.
+- **Course outline** sidebar lists every chapter, topic and question with progress ticks. Collapse or expand any chapter or topic (or all at once), or hide the whole sidebar with « / ☰ Outline; the layout is remembered. Click any question to jump there; links like `chapter03.html#q13` open a question directly.
+- **Copy buttons** on every revealed answer and its SQL equivalent.
 - **Reset to this question** rebuilds the data as if every earlier question was answered correctly.
 - **Data panel** shows the collection live and highlights the rows each command changes.
 - Enter runs a command (an open bracket continues on a new line), Shift+Enter adds a line, ↑/↓ recall history, `cls` clears, **F** toggles full screen.

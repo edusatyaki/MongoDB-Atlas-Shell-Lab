@@ -26,7 +26,7 @@ a{color:inherit}
 .brand svg{width:26px;height:26px;flex:none}
 .brand b{display:block;font-size:17px;letter-spacing:.2px}
 .brand small{display:block;font-size:12px;color:#AFC0BE}
-.menu{display:none;align-items:center;gap:6px;background:transparent;border:1px solid #3D5260;color:#fff;border-radius:8px;padding:7px 12px;font-size:14px}
+.menu{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid #3D5260;color:#fff;border-radius:8px;padding:7px 12px;font-size:14px}
 .prog{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:13px;color:#C9D4D2;white-space:nowrap}
 .prog .bar{width:180px;height:6px;border-radius:3px;background:#22394A;overflow:hidden}
 .prog .bar i{display:block;height:100%;width:0;background:var(--mint);border-radius:3px;transition:width .3s}
@@ -36,22 +36,39 @@ a{color:inherit}
 /* ---------- frame ---------- */
 .frame{flex:1;min-height:0;display:flex}
 .work{flex:1;min-width:0;display:flex;flex-direction:column}
+.side-off .outline{display:none}
 .panes{flex:1;min-height:0;display:grid;grid-template-columns:minmax(360px,42%) minmax(0,1fr);gap:16px;padding:16px}
 
 /* ---------- course outline (always expanded) ---------- */
 .outline{width:var(--side);flex:none;background:var(--card);border-right:1px solid var(--line);overflow-y:auto;padding:18px 0 28px}
-.ol-label{padding:0 20px 10px;font-size:11px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint)}
+.ol-bar{display:flex;align-items:center;gap:4px;padding:0 12px 12px 20px}
+.ol-label{flex:1;white-space:nowrap;font-size:11px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint)}
+.ol-act{background:none;border:0;color:var(--accent);font-size:12px;font-weight:bold;padding:4px 6px;border-radius:6px}
+.ol-act:hover{background:var(--accentbg)}
+.ol-hide{background:none;border:1px solid var(--line);color:var(--muted);width:26px;height:26px;border-radius:6px;font-size:15px;line-height:1;margin-left:4px}
+.ol-hide:hover{color:var(--ink);border-color:var(--ink2)}
+.chev{width:16px;height:16px;flex:none;color:var(--faint);transition:transform .15s}
+.shut > .chap-head .chev,.topic.shut .chev{transform:rotate(-90deg)}
+[hidden]{display:none !important}
 .chap{margin:0 12px 18px}
-.chap-head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:10px 10px;border-radius:8px;text-decoration:none;color:var(--ink)}
-a.chap-head:hover{background:var(--hover)}
+.chap-head{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;width:100%;padding:10px;border:0;border-radius:8px;background:none;text-align:left;font-size:inherit;color:var(--ink)}
+button.chap-head:hover{background:var(--hover)}
+div.chap-head{grid-template-columns:1fr auto;padding:0;gap:0}
+.chap-link{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:10px;border-radius:8px;text-decoration:none;color:var(--ink)}
+.chap-link:hover{background:var(--hover)}
+.chap-tog{background:none;border:0;padding:10px 10px 10px 6px;border-radius:8px;display:grid;place-items:center}
+.chap-tog:hover{background:var(--hover)}
 .chap.on .chap-head{background:var(--accentbg)}
+.chap.on .chap-head:hover{background:#D3F7EC}
 .chap-num{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:bold;font-size:13px;background:var(--line2);color:var(--ink2)}
 .chap.on .chap-num{background:var(--accent);color:#fff}
 .chap-title{font-weight:bold;font-size:15px;line-height:1.25}
 .chap-title small{display:block;font-weight:normal;font-size:12px;color:var(--muted);margin-top:2px}
 .chap-count{font-size:12px;color:var(--muted);font-weight:bold}
-.topic{margin:12px 0 2px;padding:0 10px 0 54px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
-.topic span{font-weight:normal;letter-spacing:0;color:var(--faint)}
+.topic{display:flex;align-items:center;gap:6px;width:100%;margin:8px 0 1px;padding:5px 10px 5px 32px;background:none;border:0;border-radius:6px;text-align:left;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.topic:hover{background:var(--hover);color:var(--ink)}
+.topic .tn{flex:1}
+.topic .tc{font-weight:normal;letter-spacing:0;color:var(--faint)}
 .qi{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:center;width:100%;padding:5px 10px 5px 21px;margin:1px 0;background:none;border:0;border-left:3px solid transparent;border-radius:0 6px 6px 0;text-align:left;text-decoration:none;font-size:14px;line-height:1.3;color:var(--ink2)}
 .qi:hover{background:var(--hover)}
 .qi .st{width:22px;height:22px;border-radius:50%;border:1.5px solid #C1C7C6;display:grid;place-items:center;font-size:10px;font-weight:bold;color:var(--muted);background:#fff}
@@ -84,6 +101,13 @@ table.need th{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.primary:hover{background:#00593F}
 .reveal{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#fff}
+.codebox{position:relative}
+.copy{position:absolute;top:8px;right:8px;border:1px solid #3D5260;background:#1C3644;color:#E8EDEB;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold;font-family:Arial,Helvetica,sans-serif}
+.copy:hover{background:#25475A;border-color:var(--mint)}
+.copy.ok{background:var(--accent);border-color:var(--accent);color:#fff}
+.sql .copy{background:#fff;border-color:var(--line);color:var(--ink)}
+.sql .copy:hover{background:var(--hover);border-color:var(--ink2)}
+.reveal pre{padding-right:84px !important}
 .reveal pre{margin:0 0 12px;background:var(--sh-bg);color:var(--sh-str);padding:12px 14px;border-radius:6px;font-size:14px;white-space:pre-wrap;overflow-x:auto}
 .reveal p{margin:0;color:var(--ink2);font-size:15px}
 .reveal .sql{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2)}
@@ -149,7 +173,7 @@ table.need th{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:
 
 /* ---------- responsive ---------- */
 @media (max-width:1240px){
-  .menu{display:inline-flex}
+  .side-off .outline{display:block}
   .outline{position:fixed;z-index:30;top:var(--top);bottom:0;left:0;transform:translateX(-100%);transition:transform .2s;box-shadow:4px 0 24px rgba(0,30,43,.18)}
   .outline.open{transform:none}
   .scrim.on{display:block;position:fixed;inset:var(--top) 0 0 0;background:rgba(0,30,43,.3);z-index:25}

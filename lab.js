@@ -34,23 +34,34 @@ function topicsOf(c){
   c.tasks.forEach((t,i)=>{ const last = groups[groups.length-1]; if (last && last.name === t.group) last.items.push(i); else groups.push({ name:t.group, items:[i] }); });
   return groups;
 }
+/* outline collapse state: closed chapter/topic keys + hidden sidebar, remembered per browser */
+const OKEY = 'atlas-lab-outline';
+let closed = new Set(), sideOff = false;
+try { const o = JSON.parse(localStorage.getItem(OKEY) || 'null'); if (o){ closed = new Set(o.closed || []); sideOff = !!o.sideOff; } } catch(_){}
+function saveOutline(){ try { localStorage.setItem(OKEY, JSON.stringify({ closed:[...closed], sideOff })); } catch(_){} }
+const topicKey = (c,g) => `${c.id}:t${g.items[0]}`;
+const CHEV = '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function openCurrent(){ closed.delete(CH.id); const g = topicsOf(CH).find(g=>g.items.includes(idx)); if (g) closed.delete(topicKey(CH,g)); }
 function renderOutline(){
   const html = CHAPTERS.map(c=>{
-    const on = c === CH, d = doneOf(c);
+    const on = c === CH, d = doneOf(c), shut = closed.has(c.id);
     const head = `<span class="chap-num">${c.num}</span><span class="chap-title">${esc(c.title)}<small>${esc(c.story)}</small></span><span class="chap-count">${d.size}/${c.tasks.length}</span>`;
     const topics = topicsOf(c).map(g=>{
-      const n = g.items.filter(i=>d.has(i)).length;
+      const n = g.items.filter(i=>d.has(i)).length, k = topicKey(c,g), tshut = closed.has(k);
       const items = g.items.map(i=>{
         const cls = `qi${d.has(i)?' done':''}${on && i===idx && !finished?' cur':''}`;
         const inner = `<span class="st">${d.has(i)?'✓':i+1}</span><span>${esc(c.tasks[i].title)}</span>`;
         return on ? `<button type="button" class="${cls}" data-i="${i}"${i===idx&&!finished?' aria-current="step"':''}>${inner}</button>`
                   : `<a class="${cls}" href="${c.href}#q${i+1}">${inner}</a>`;
       }).join('');
-      return `<div class="topic">${esc(g.name)}<span>${n}/${g.items.length}</span></div>${items}`;
+      return `<button type="button" class="topic${tshut?' shut':''}" data-tog="${k}" aria-expanded="${!tshut}">${CHEV}<span class="tn">${esc(g.name)}</span><span class="tc">${n}/${g.items.length}</span></button><div class="items"${tshut?' hidden':''}>${items}</div>`;
     }).join('');
-    return `<section class="chap${on?' on':''}">${on ? `<div class="chap-head">${head}</div>` : `<a class="chap-head" href="${c.href}">${head}</a>`}${topics}</section>`;
+    const headHtml = on
+      ? `<button type="button" class="chap-head" data-tog="${c.id}" aria-expanded="${!shut}">${head}${CHEV}</button>`
+      : `<div class="chap-head"><a class="chap-link" href="${c.href}" title="Open chapter ${c.num}">${head}</a><button type="button" class="chap-tog" data-tog="${c.id}" aria-expanded="${!shut}" aria-label="Show or hide chapter ${c.num} topics">${CHEV}</button></div>`;
+    return `<section class="chap${on?' on':''}${shut?' shut':''}">${headHtml}<div class="topics"${shut?' hidden':''}>${topics}</div></section>`;
   }).join('');
-  $('outline').innerHTML = `<div class="ol-label">Course outline</div>${html}`;
+  $('outline').innerHTML = `<div class="ol-bar"><span class="ol-label">Course outline</span><button type="button" class="ol-act" data-all="open" title="Expand all chapters and topics">Expand</button><button type="button" class="ol-act" data-all="close" title="Collapse all chapters and topics">Collapse</button><button type="button" class="ol-hide" id="olHide" aria-label="Hide course outline" title="Hide outline">«</button></div>${html}`;
   $('progText').textContent = `Chapter ${CH.num} · ${done.size} of ${TASKS.length} complete`;
   $('progBar').style.width = (100*done.size/TASKS.length) + '%';
 }
@@ -78,8 +89,9 @@ function renderQ(){
       <button class="btn${done.has(idx)?'':' primary'}" id="rev" type="button">${revealed ? 'Hide answer' : 'Show answer'}</button>
       ${idx>0 ? '<button class="btn" id="rst" type="button" title="Rebuild the data as if every earlier question was answered correctly">↺ Reset to this question</button>' : ''}
     </div>
-    ${revealed ? `<div class="reveal"><pre>${esc(t.answer)}</pre><p>${t.explain}</p>${t.sql ? `<div class="sql"><span>SQL equivalent</span><pre>${esc(t.sql)}</pre></div>` : ''}</div>` : ''}`;
+    ${revealed ? `<div class="reveal"><div class="codebox"><pre>${esc(t.answer)}</pre><button type="button" class="copy" data-copy="answer">Copy</button></div><p>${t.explain}</p>${t.sql ? `<div class="sql"><span>SQL equivalent</span><div class="codebox"><pre>${esc(t.sql)}</pre><button type="button" class="copy" data-copy="sql">Copy</button></div></div>` : ''}</div>` : ''}`;
   $('rev').onclick = ()=>{ revealed = !revealed; renderQ(); };
+  q.querySelectorAll('.copy').forEach(b=> b.onclick = ()=> copyText(t[b.dataset.copy], b));
   if ($('rst')) $('rst').onclick = ()=>{ goTo(idx, true); };
 }
 function renderNav(){
@@ -110,6 +122,7 @@ function renderAll(){ renderOutline(); renderQ(); renderNav(); renderData(); set
 function goTo(i, rebuild){
   const advancing = i === idx + 1 && done.has(idx) && !rebuild;
   idx = i; finished = false; revealed = false; status = null;
+  openCurrent(); saveOutline();
   if (!advancing){
     replayTo(i);
     out.innerHTML = '';
@@ -232,8 +245,28 @@ $('shell').addEventListener('click', e=>{ if (!window.getSelection().toString() 
 $('clr').onclick = ()=>{ out.innerHTML = ''; cmd.focus(); };
 function scrollOutline(){ const b = $('outline').querySelector('.qi.cur'); if (b) b.scrollIntoView({ block:'nearest' }); }
 function drawer(open){ $('outline').classList.toggle('open', open); $('scrim').classList.toggle('on', open); $('menu').setAttribute('aria-expanded', open); }
-$('outline').addEventListener('click', e=>{ const b = e.target.closest('button.qi'); if (b){ drawer(false); goTo(+b.dataset.i, true); } });
-$('menu').onclick = ()=> drawer(!$('outline').classList.contains('open'));
+const narrow = () => innerWidth <= 1240;
+function setSide(off){ sideOff = off; $('app').classList.toggle('side-off', off); $('menu').setAttribute('aria-expanded', !off); saveOutline(); }
+$('outline').addEventListener('click', e=>{
+  const q = e.target.closest('button.qi');
+  if (q){ drawer(false); goTo(+q.dataset.i, true); return; }
+  const tg = e.target.closest('[data-tog]');
+  if (tg){ const k = tg.dataset.tog; closed.has(k) ? closed.delete(k) : closed.add(k); saveOutline(); renderOutline(); return; }
+  const all = e.target.closest('[data-all]');
+  if (all){
+    closed.clear();
+    if (all.dataset.all === 'close') CHAPTERS.forEach(c=>{ closed.add(c.id); topicsOf(c).forEach(g=>closed.add(topicKey(c,g))); });
+    saveOutline(); renderOutline(); return;
+  }
+  if (e.target.closest('#olHide')) narrow() ? drawer(false) : setSide(true);
+});
+$('menu').onclick = ()=> narrow() ? drawer(!$('outline').classList.contains('open')) : setSide(!sideOff);
+setSide(sideOff);
+function copyText(text, btn){
+  const done = ok => { btn.textContent = ok ? 'Copied ✓' : 'Press ⌘C'; btn.classList.toggle('ok', ok); setTimeout(()=>{ btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1600); };
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch(_){} ta.remove(); done(ok); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(()=>done(true), fallback); else fallback();
+}
 $('scrim').onclick = ()=> drawer(false);
 document.addEventListener('keydown', e=>{ if (e.key === 'Escape') drawer(false); });
 window.addEventListener('resize', ()=>{ out.scrollTop = out.scrollHeight; if (innerWidth > 1240) drawer(false); });
