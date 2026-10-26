@@ -59,7 +59,8 @@ function renderOutline(){
     const headHtml = on
       ? `<button type="button" class="chap-head" data-tog="${c.id}" aria-expanded="${!shut}">${head}${CHEV}</button>`
       : `<div class="chap-head"><a class="chap-link" href="${c.href}" title="Open chapter ${c.num}">${head}</a><button type="button" class="chap-tog" data-tog="${c.id}" aria-expanded="${!shut}" aria-label="Show or hide chapter ${c.num} topics">${CHEV}</button></div>`;
-    return `<section class="chap${on?' on':''}${shut?' shut':''}">${headHtml}<div class="topics"${shut?' hidden':''}>${topics}</div></section>`;
+    const dsRow = c.dataset ? `<button type="button" class="qi ds" data-ds="${c.id}"><span class="st">{ }</span><span>Dataset · setup code</span></button>` : '';
+    return `<section class="chap${on?' on':''}${shut?' shut':''}">${headHtml}<div class="topics"${shut?' hidden':''}>${dsRow}${topics}</div></section>`;
   }).join('');
   $('outline').innerHTML = `<div class="ol-bar"><span class="ol-label">Course outline</span><button type="button" class="ol-act" data-all="open" title="Expand all chapters and topics">Expand</button><button type="button" class="ol-act" data-all="close" title="Collapse all chapters and topics">Collapse</button><button type="button" class="ol-hide" id="olHide" aria-label="Hide course outline" title="Hide outline">«</button></div>${html}`;
   $('progText').textContent = `Chapter ${CH.num} · ${done.size} of ${TASKS.length} complete`;
@@ -162,6 +163,40 @@ function run(src){
   renderAll();
 }
 
+/* ---------- dataset setup code (paste into Atlas / mongosh) ---------- */
+function jsLit(v){
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(jsLit).join(', ') + ']';
+  if (v && typeof v === 'object') return '{ ' + Object.keys(v).map(k=>`${/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k)}: ${jsLit(v[k])}`).join(', ') + ' }';
+  if (typeof v === 'number' && Math.abs(v) >= 1e15) return v.toExponential();
+  return String(v);
+}
+function docLit(d, multi){
+  if (!multi) return '  ' + jsLit(d);
+  return '  {\n' + Object.keys(d).map(k=>`    ${k}: ${jsLit(d[k])}`).join(',\n') + '\n  }';
+}
+function datasetCode(c){
+  const ds = c.dataset;
+  return `// Chapter ${c.num} · ${c.title} — ${c.story}\n// Paste into the Atlas shell or mongosh. Re-running it starts clean.\n\nuse ${ds.db}\n\ndb.${ds.coll}.drop();\n\ndb.${ds.coll}.insertMany([\n${ds.docs.map(d=>docLit(d, ds.docs.some(x=>jsLit(x).length > 94))).join(',\n')}\n]);\n\ndb.${ds.coll}.countDocuments();   // ${ds.docs.length}`;
+}
+function openDataset(c){
+  let m = $('dsModal');
+  if (!m){
+    m = document.createElement('div'); m.id = 'dsModal'; m.className = 'modal'; m.hidden = true;
+    m.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="dsTitle"><div class="modal-head"><div><span class="tag" id="dsTag"></span><h2 id="dsTitle"></h2></div><button type="button" class="modal-x" id="dsClose" aria-label="Close">×</button></div><p class="modal-note" id="dsNote"></p><div class="codebox"><pre id="dsCode"></pre><button type="button" class="copy" id="dsCopy">Copy</button></div><p class="modal-foot">Works in MongoDB Atlas (Data Explorer › mongosh), a local <code>mongosh</code>, or Compass’s shell tab.</p></div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', e=>{ if (e.target === m || e.target.id === 'dsClose') closeDataset(); });
+  }
+  const code = datasetCode(c);
+  $('dsTag').textContent = `Chapter ${c.num} · Dataset`;
+  $('dsTitle').textContent = `${c.dataset.db}.${c.dataset.coll} — ${c.dataset.docs.length} documents`;
+  $('dsNote').textContent = c.dataset.note;
+  $('dsCode').textContent = code;
+  $('dsCopy').onclick = ()=> copyText(code, $('dsCopy'));
+  m.hidden = false; drawer(false); $('dsCopy').focus();
+}
+function closeDataset(){ const m = $('dsModal'); if (m && !m.hidden){ m.hidden = true; cmd.focus(); } }
+
 /* automatic checking: run the model answer on the same "before" data and compare */
 const cloneState = st => ({ cur: st.cur, dbs: Object.fromEntries(Object.entries(st.dbs).map(([k,d])=>[k, { colls: Object.fromEntries(Object.entries(d.colls).map(([n,c])=>[n, Object.assign({}, c, { docs: c.docs.map(clone) })])) }])) });
 function expectedFrom(before, answer){
@@ -248,6 +283,8 @@ function drawer(open){ $('outline').classList.toggle('open', open); $('scrim').c
 const narrow = () => innerWidth <= 1240;
 function setSide(off){ sideOff = off; $('app').classList.toggle('side-off', off); $('menu').setAttribute('aria-expanded', !off); saveOutline(); }
 $('outline').addEventListener('click', e=>{
+  const dsb = e.target.closest('[data-ds]');
+  if (dsb){ openDataset(CHAPTERS.find(c=>c.id === dsb.dataset.ds)); return; }
   const q = e.target.closest('button.qi');
   if (q){ drawer(false); goTo(+q.dataset.i, true); return; }
   const tg = e.target.closest('[data-tog]');
@@ -268,7 +305,8 @@ function copyText(text, btn){
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(()=>done(true), fallback); else fallback();
 }
 $('scrim').onclick = ()=> drawer(false);
-document.addEventListener('keydown', e=>{ if (e.key === 'Escape') drawer(false); });
+document.addEventListener('keydown', e=>{ if (e.key === 'Escape'){ drawer(false); closeDataset(); } });
+$('dsBtn').onclick = ()=> openDataset(CH);
 window.addEventListener('resize', ()=>{ out.scrollTop = out.scrollHeight; if (innerWidth > 1240) drawer(false); });
 $('dchips').addEventListener('click', e=>{ const b = e.target.closest('.chip'); if (b){ dataColl = b.dataset.c; renderData(); } });
 $('dtog').onclick = ()=>{ const d = $('data'); d.classList.toggle('min'); $('dtog').textContent = d.classList.contains('min') ? 'Show' : 'Hide'; };

@@ -285,6 +285,11 @@ const CH02_TASKS = [
   host: 'Atlas atlas-lj7k2q-shard-0 [primary]',
   cluster: 'lusciousjewels.lj7k2q.mongodb.net',
   startNote: 'fresh cluster',
+  dataset: {
+    db: 'LusciousJewels', coll: 'products',
+    docs: [{ name:'Gold Necklace', price:2500, category:'Necklace', stock:15 }].concat(fourItems.map(([name,price,category,stock])=>({ name, price, category, stock }))),
+    note: 'The Luscious Jewels inventory as it stands after Question 6 (one insertOne plus the insertMany batch). Load it to practise the read, update and delete questions in a real shell.'
+  },
   tasks: CH02_TASKS,
   finish: {
     tag: 'Chapter 02 complete', title: 'Thank you!',

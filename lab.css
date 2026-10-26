@@ -191,3 +191,21 @@ table.need th{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:
   .credit{order:5;flex-basis:100%;margin:0;text-align:center}
   .crumb{flex:1;text-align:center}
 }
+
+/* ---------- dataset setup code ---------- */
+.qi.ds{color:var(--accent);font-weight:bold}
+.qi.ds .st{border-style:dashed;border-color:var(--accent);color:var(--accent);font-size:9px;letter-spacing:-.5px}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,30,43,.45);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal-card{background:var(--card);border-radius:12px;box-shadow:0 20px 60px rgba(0,30,43,.35);width:min(820px,100%);min-width:0;max-height:calc(100vh - 48px);display:flex;flex-direction:column;gap:12px;padding:22px 24px}
+.modal-head{display:flex;align-items:flex-start;gap:12px}
+.modal-head > div{flex:1}
+.modal-head h2{margin:8px 0 0;font-size:20px;color:var(--ink)}
+.modal-x{background:none;border:1px solid var(--line);border-radius:8px;width:34px;height:34px;font-size:20px;line-height:1;color:var(--muted)}
+.modal-x:hover{color:var(--ink);border-color:var(--ink2)}
+.modal-note{margin:0;color:var(--ink2);font-size:15px}
+.modal .codebox{min-height:0;min-width:0;display:flex}
+.modal pre{flex:1;min-width:0;margin:0;overflow:auto;background:var(--sh-bg);color:var(--sh-str);padding:14px 84px 14px 16px;border-radius:8px;font-size:13.5px;line-height:1.5;white-space:pre}
+.modal-foot{margin:0;color:var(--muted);font-size:13px}
+.modal-foot code{background:var(--line2);padding:1px 5px;border-radius:4px}
+.modal .codebox{max-height:60vh}
+@media (max-width:900px){ .modal{padding:12px} .modal-card{padding:18px 16px} }

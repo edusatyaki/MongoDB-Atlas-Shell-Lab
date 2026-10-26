@@ -255,6 +255,10 @@ const CH03_TASKS = [
   coll: 'astronomy_data',
   colOrder: ['name','type','mass_kg','distance_from_sun_km','temperature_K','moons','planets','parent','life','distance_from_earth_ly','distance_ly','origin','lastUpdated','lastChecked'],
   startNote: 'astronomy_data loaded — 12 documents',
+  dataset: {
+    db: 'MissionMongo', coll: 'astronomy_data', docs: UNIVERSE,
+    note: 'The 12-object universe every Mission Mongo question starts from. The update questions build on each other, so reload it to start again.'
+  },
   init(){
     const docs = UNIVERSE.map((d,i)=>prepDoc(Object.assign({ _id: new ObjectId('6650c0de' + (i+1).toString(16).padStart(16,'0')) }, d)));
     return { cur:'MissionMongo', dbs:{ MissionMongo:{ colls:{ astronomy_data:{ docs, capped:false } } } } };
