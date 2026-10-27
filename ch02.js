@@ -1,299 +1,272 @@
 /* ============================================================
-   Chapter 02 · CRUD Operations — Luscious Jewels
-   Questions follow the deck, one shell action each
+   Chapter 02 · Update & Query Operators — Mission Mongo
+   Every question is a query from the deck. Checking is automatic:
+   the model answer runs on the same data and the results (or the
+   resulting documents) must match, using the operator being taught.
    ============================================================ */
-const P = () => (S.dbs.LusciousJewels && S.dbs.LusciousJewels.colls.products) || null;
-const docs = () => (P() ? P().docs : []);
-const byName = n => docs().filter(d=>d.name === n);
-const called = (c, m, coll) => c.calls.filter(x=>x.method === m && (coll === undefined || x.coll === coll));
-const gate = () => S.cur !== 'LusciousJewels' ? `You're working in <code>${esc(S.cur)}</code>. Switch first: <code>use LusciousJewels</code>.` : null;
-const emptyFilter = f => f === undefined || (isObj(f) && !Object.keys(f).length);
-const fourItems = [
-  ['Silver Ring', 800, 'Ring', 20],
-  ['Diamond Ring', 5200, 'Ring', 5],
-  ['Pearl Earrings', 1200, 'Earrings', 30],
-  ['Test Bangle', 0, 'Bangle', 0]
+const UNIVERSE = [
+  { name:'Sun', type:'Star', mass_kg:1.989e30, temperature_K:5778, planets:['Mercury','Venus','Mars','Jupiter','Saturn'] },
+  { name:'Mercury', type:'Planet', mass_kg:3.285e23, distance_from_sun_km:57900000, temperature_K:440 },
+  { name:'Venus', type:'Planet', mass_kg:4.867e24, distance_from_sun_km:108200000, temperature_K:737 },
+  { name:'Earth', type:'Planet', mass_kg:5.972e24, distance_from_sun_km:149600000, temperature_K:288, moons:['Moon'], life:true },
+  { name:'Mars', type:'Planet', mass_kg:6.39e23, distance_from_sun_km:227900000, temperature_K:210 },
+  { name:'Jupiter', type:'Planet', mass_kg:1.898e27, distance_from_sun_km:778500000, temperature_K:165, moons:['Io','Europa','Ganymede','Callisto'] },
+  { name:'Saturn', type:'Planet', mass_kg:5.683e26, distance_from_sun_km:1434000000, temperature_K:134, moons:['Titan','Enceladus'] },
+  { name:'Ceres', type:'Dwarf Planet', mass_kg:9.38e20, distance_from_sun_km:413700000, temperature_K:168 },
+  { name:'callisto', type:'Moon', parent:'Jupiter', temperature_K:134 },
+  { name:'Proxima Centauri', type:'Star', mass_kg:2.446e29, temperature_K:3042, distance_from_earth_ly:4.24 },
+  { name:'Andromeda Galaxy', type:'Galaxy', mass_kg:3e42, distance_from_earth_ly:2537000 },
+  { name:'Cosmic Microwave Background', type:'Radiation', temperature_K:2.725 }
 ];
-const hasItem = ([n,p,c,s]) => byName(n).some(d=>d.price===p && d.category===c && d.stock===s);
 
-const CH02_TASKS = [
-  { group:'Database', title:'Pick a database',
-    story:'<b>D. Soni</b> runs Luscious Jewels, a growing jewellery brand. She doesn’t just want to manage jewellery — she wants to manage her data too, and she needs your help.',
-    ask:'Switch the shell to a database called <code>LusciousJewels</code>.',
-    answer:'use LusciousJewels',
-    explain:'<code>use</code> sets your working database to <code>LusciousJewels</code>, but MongoDB doesn’t actually create it until you store data in it.',
-    check:c=>{
-      if (!c.special || c.special.type !== 'use') return false;
-      return S.cur === 'LusciousJewels' || `You switched to <code>${esc(S.cur)}</code>. Database names are case-sensitive — it must be exactly <code>LusciousJewels</code>.`;
-    },
-    note:'The prompt now ends in <code>LusciousJewels&gt;</code>. Is the database really there yet? Find out next.' },
+const CH03_TASKS = [
+  /* ---------- STAGE 01.01 · Comparison ---------- */
+  { group:'Comparison', kind:'find', ops:['$eq'], title:'Exactly Earth',
+    story:'<b>Mission Control</b> has loaded <code>astronomy_data</code>: 12 objects, from the Sun to the Cosmic Microwave Background. Your universe is in the Data panel. <b>Stage 01.01</b> compares a field with a value.',
+    ask:'Find objects whose <code>name</code> is exactly <code>"Earth"</code>. Use <code>$eq</code>.',
+    answer:'db.astronomy_data.find(\n  { name: { $eq: "Earth" } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE name = 'Earth';",
+    explain:'<code>$eq</code> matches values equal to the one given. <code>{ name: "Earth" }</code> is the shorthand for the same thing.',
+    note:'One document — Earth.' },
+  { group:'Comparison', kind:'find', ops:['$ne'], title:'Not a planet',
+    ask:'Find objects which are <strong>not</strong> planets. Use <code>$ne</code> on <code>type</code>.',
+    answer:'db.astronomy_data.find(\n  { type: { $ne: "Planet" } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE type <> 'Planet';",
+    explain:'<code>$ne</code> means “not equal”. It also matches documents that don’t have the field at all.',
+    note:'Stars, the galaxy, the CMB, Ceres (a <em>Dwarf</em> Planet) and the moon callisto.' },
+  { group:'Comparison', kind:'find', ops:['$gt'], title:'Heavier than 1e25 kg',
+    ask:'Find all objects with <code>mass_kg</code> greater than <code>1e25</code>.',
+    answer:'db.astronomy_data.find(\n  { mass_kg: { $gt: 1e25 } }\n)',
+    sql:'SELECT *\nFROM astronomy_data\nWHERE mass_kg > 1e25;',
+    explain:'<code>$gt</code> is “greater than”. <code>1e25</code> is JavaScript scientific notation for 1 × 10²⁵.',
+    note:'Jupiter, Saturn, two stars and the Andromeda Galaxy. Earth (5.97e24) is just below.' },
+  { group:'Comparison', kind:'find', ops:['$in','$gte'], title:'Stars or planets ≥ 5e24 kg',
+    ask:'Find stars or planets (use <code>$in</code> on <code>type</code>) whose <code>mass_kg</code> is at least <code>5e24</code> (use <code>$gte</code>).',
+    answer:'db.astronomy_data.find(\n  {\n    type: { $in: ["Planet", "Star"] },\n    mass_kg: { $gte: 5e24 }\n  }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE type IN ('Planet', 'Star')\n  AND mass_kg >= 5e24;",
+    explain:'<code>$in</code> matches any value in the list. Two conditions in one filter document are joined with an implicit AND.',
+    note:'Venus (4.87e24) just misses out; Earth makes it.' },
+  { group:'Comparison', kind:'find', ops:['$lt'], title:'Closer than 200 million km',
+    ask:'Find <strong>planets</strong> closer than <code>200000000</code> km to the Sun (<code>distance_from_sun_km</code>).',
+    answer:'db.astronomy_data.find(\n  {\n    type: "Planet",\n    distance_from_sun_km: { $lt: 200000000 }\n  }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE type = 'Planet'\n  AND distance_from_sun_km < 200000000;",
+    explain:'<code>$lt</code> is “less than”. Combined with <code>type: "Planet"</code> through the implicit AND.',
+    note:'Mercury, Venus and Earth.' },
+  { group:'Comparison', kind:'find', ops:['$lte'], title:'Coldest of all',
+    ask:'Find objects with <code>temperature_K</code> less than or equal to <code>2.725</code>.',
+    answer:'db.astronomy_data.find(\n  { temperature_K: { $lte: 2.725 } }\n)',
+    sql:'SELECT *\nFROM astronomy_data\nWHERE temperature_K <= 2.725;',
+    explain:'<code>$lte</code> is “less than or equal to”, so the CMB at exactly 2.725 K is included.',
+    note:'Only the Cosmic Microwave Background — 2.725 K.' },
 
-  { group:'Database', title:'Does it exist yet?',
-    story:'She wants to see every database on her Atlas cluster.',
-    ask:'List all databases on the cluster. Look for <code>LusciousJewels</code> in the output.',
-    answer:'show dbs',
-    explain:'<code>show dbs</code> lists only databases that hold data. <code>LusciousJewels</code> is missing because <code>use</code> doesn’t create anything on its own.',
-    check:c=> !!(c.special && c.special.type === 'showdbs'),
-    note:'<code>LusciousJewels</code> is <strong>not</strong> in the list. MongoDB creates a database only when its first collection or document is stored.' },
+  /* ---------- STAGE 01.02 · Logical ---------- */
+  { group:'Logical', kind:'find', ops:['$or'], title:'Massive OR close',
+    story:'<b>Stage 01.02</b> combines conditions with logical operators. Each takes an <strong>array</strong> of conditions.',
+    ask:'Find objects with <code>mass_kg</code> &gt; <code>1e26</code> <strong>or</strong> <code>distance_from_sun_km</code> &lt; <code>200000000</code>.',
+    answer:'db.astronomy_data.find(\n  { $or: [\n      { mass_kg: { $gt: 1e26 } },\n      { distance_from_sun_km: { $lt: 200000000 } }\n  ] }\n)',
+    sql:'SELECT *\nFROM astronomy_data\nWHERE mass_kg > 1e26\n   OR distance_from_sun_km < 200000000;',
+    explain:'<code>$or</code> keeps a document if <em>any</em> condition in its array matches.',
+    note:'The heavyweights plus the three inner planets.' },
+  { group:'Logical', kind:'find', ops:['$and','$exists'], title:'Not Earth, but has moons',
+    ask:'Find objects that are <strong>not</strong> Earth <strong>and</strong> have a <code>moons</code> field. Use <code>$and</code> and <code>$exists</code>.',
+    answer:'db.astronomy_data.find(\n  { $and: [\n      { name: { $ne: "Earth" } },\n      { moons: { $exists: true } }\n  ] }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE name <> 'Earth'\n  AND moons IS NOT NULL;",
+    explain:'<code>$and</code> needs every condition to match. <code>$exists: true</code> keeps documents that have the field, whatever its value.',
+    note:'Jupiter and Saturn. Mars has no <code>moons</code> field yet — you’ll add some in Stage 02.' },
+  { group:'Logical', kind:'find', ops:['$nor'], title:'Neither planet nor star',
+    ask:'Find objects which are <strong>neither</strong> planets <strong>nor</strong> stars. Use <code>$nor</code>.',
+    answer:'db.astronomy_data.find(\n  { $nor: [\n      { type: "Planet" },\n      { type: "Star" }\n  ] }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE type NOT IN ('Planet', 'Star');",
+    explain:'<code>$nor</code> keeps a document only if <em>none</em> of the conditions match.',
+    note:'Ceres, callisto, Andromeda and the CMB.' },
+  { group:'Logical', kind:'find', ops:['$not'], title:'Not farther than 500 million km',
+    ask:'Find <strong>planets</strong> whose <code>distance_from_sun_km</code> is <strong>not</strong> greater than <code>500000000</code>. Use <code>$not</code>.',
+    answer:'db.astronomy_data.find(\n  {\n    type: "Planet",\n    distance_from_sun_km: { $not: { $gt: 500000000 } }\n  }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE type = 'Planet'\n  AND NOT (distance_from_sun_km > 500000000);",
+    explain:'<code>$not</code> wraps another operator and inverts it. It sits on a field, unlike <code>$nor</code>, which takes whole conditions.',
+    note:'The four rocky planets: Mercury, Venus, Earth, Mars.' },
 
-  { group:'Create', title:'Create the inventory',
-    story:'She’s thinking of one inventory to manage all her products.',
-    ask:'Explicitly create a collection named <code>products</code> in the current database.',
-    answer:'db.createCollection("products");',
-    explain:'<code>db.createCollection()</code> explicitly creates a new, empty collection in the current database. You can also create a collection implicitly by inserting the first document into it.',
-    check:c=>{
-      const mk = called(c,'createCollection');
-      if (!mk.length) return false;
-      const g = gate(); if (g) return g;
-      if (!P()) return `You created <code>${esc(mk[0].coll)}</code>. The inventory collection must be named <code>products</code>.`;
-      return true;
-    },
-    note:'<code>{ ok: 1 }</code> means the server created it. Next, check that it’s there.' },
+  /* ---------- STAGE 01.03 · Array ---------- */
+  { group:'Array', kind:'find', ops:['$in'], title:'Has the moon Europa',
+    story:'<b>Stage 01.03</b> queries array fields. <code>moons</code> is an array of names.',
+    ask:'Find planets that have the moon <code>"Europa"</code>. Use <code>$in</code> on <code>moons</code>.',
+    answer:'db.astronomy_data.find(\n  { moons: { $in: ["Europa"] } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE moons LIKE '%Europa%';",
+    explain:'On an array field, <code>$in</code> matches when <em>any element</em> equals any listed value.',
+    note:'Jupiter.' },
+  { group:'Array', kind:'find', ops:['$all'], title:'Has both Io and Europa',
+    ask:'Find planets that have <strong>all</strong> of the moons <code>"Io"</code> and <code>"Europa"</code>.',
+    answer:'db.astronomy_data.find(\n  { moons: { $all: ["Io", "Europa"] } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE moons LIKE '%Io%'\n  AND moons LIKE '%Europa%';",
+    explain:'<code>$all</code> requires the array to contain every listed value, in any order.',
+    note:'Jupiter again — it has both.' },
+  { group:'Array', kind:'find', ops:['$elemMatch'], title:'Ganymede or Io',
+    ask:'Find planets with a moon that is <code>"Ganymede"</code> or <code>"Io"</code>, using <code>$elemMatch</code> with <code>$in</code>.',
+    answer:'db.astronomy_data.find(\n  { moons: { $elemMatch: { $in: ["Ganymede", "Io"] } } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE EXISTS (\n  SELECT 1 FROM unnest(moons) AS m\n  WHERE m IN ('Ganymede', 'Io')\n);",
+    explain:'<code>$elemMatch</code> needs <em>one single element</em> to satisfy all the conditions inside it.',
+    note:'Jupiter.' },
 
-  { group:'Create', title:'Now it is created',
-    story:'She wants proof that the inventory exists.',
-    ask:'List the collections in the current database.',
-    answer:'show collections',
-    explain:'<code>show collections</code> lists every collection in the current database.',
-    check:c=>{
-      if (!c.special || c.special.type !== 'showcolls') return false;
-      return gate() || (P() ? true : 'No <code>products</code> collection here yet. Go back one question and create it.');
-    },
-    note:'<code>products</code> is listed. Run <code>show dbs</code> again and <code>LusciousJewels</code> now appears, because it holds a collection.' },
+  /* ---------- STAGE 01.04 · Regex ---------- */
+  { group:'Regex', kind:'find', ops:[['$regex','re:']], title:'Names starting with C',
+    story:'<b>Stage 01.04</b> matches text patterns with regular expressions.',
+    ask:'Find all objects whose <code>name</code> starts with a capital <code>"C"</code>. Use <code>$regex</code>.',
+    answer:'db.astronomy_data.find(\n  { name: { $regex: /^C/ } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE name LIKE 'C%';",
+    explain:'<code>^</code> anchors the pattern to the start of the string. Regex matching is case-sensitive by default.',
+    note:'Ceres and the Cosmic Microwave Background — but not the lower-case <code>callisto</code>.' },
+  { group:'Regex', kind:'find', ops:[['$regex','re:']], title:'c or C, any case',
+    ask:'Find all objects whose <code>name</code> starts with <code>"c"</code> or <code>"C"</code> (case-insensitive). Use <code>$regex</code> with <code>$options</code>.',
+    answer:'db.astronomy_data.find(\n  { name: { $regex: /^c/, $options: "i" } }\n)',
+    sql:"SELECT *\nFROM astronomy_data\nWHERE LOWER(name) LIKE 'c%';",
+    explain:'<code>$options: "i"</code> makes the match case-insensitive. <code>/^c/i</code> is the short form.',
+    note:'Now <code>callisto</code>, logged in lower case, is found too.' },
 
-  { group:'Create', title:'Add one product',
-    story:'She wants to store the details of her first product.',
-    ask:'Insert one document into <code>products</code>:',
-    table:[['name','price','category','stock'],['Gold Necklace',2500,'Necklace',15]],
-    answer:'db.products.insertOne({\n  name: "Gold Necklace",\n  price: 2500,\n  category: "Necklace",\n  stock: 15\n});',
-    explain:'<code>insertOne()</code> stores a single document. Because you gave no <code>_id</code>, MongoDB generated an <code>ObjectId</code>, which you can see in <code>insertedId</code>.',
-    check:c=>{
-      const ins = called(c,'insertOne').concat(called(c,'insertMany'));
-      if (!ins.length) return false;
-      const g = gate(); if (g) return g;
-      if (ins.every(x=>x.coll !== 'products')) return `You inserted into <code>${esc(ins[0].coll)}</code>. The collection is <code>products</code>.`;
-      const gn = byName('Gold Necklace');
-      if (!gn.length) return 'No document named <code>"Gold Necklace"</code> found. Check the spelling and capital letters of <code>name</code>.';
-      if (gn.some(d=>d.price===2500 && d.category==='Necklace' && d.stock===15)) return true;
-      if (gn.some(d=>typeof d.price === 'string' || typeof d.stock === 'string')) return 'The document went in, but <code>price</code> or <code>stock</code> was saved as text. Numbers take no quotes: <code>price: 2500</code>. Click <em>Reset to this question</em> and try again.';
-      return 'The document went in, but a value doesn’t match the table. Click <em>Reset to this question</em> and insert it again.';
-    },
-    note:'One done. Look at the Data panel: the document has an <code>_id</code> that MongoDB added.' },
+  /* ---------- STAGE 02.01 · Field update ---------- */
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$set'], title:'New CMB reading',
+    story:'<b>Stage 02</b> changes data. Each question builds on the previous one — watch the Data panel.',
+    ask:'Change the <code>temperature_K</code> of <code>"Cosmic Microwave Background"</code> to <code>2.726</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Cosmic Microwave Background" },\n  { $set: { temperature_K: 2.726 } }\n)',
+    sql:"UPDATE astronomy_data\nSET temperature_K = 2.726\nWHERE name = 'Cosmic Microwave Background';",
+    explain:'<code>$set</code> replaces the value of a field, or adds the field if it is missing.',
+    note:'<code>matchedCount: 1, modifiedCount: 1</code>.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$unset'], title:'Remove a field',
+    ask:'Remove the <code>life</code> field from <code>"Earth"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Earth" },\n  { $unset: { life: "" } }\n)',
+    sql:'-- No direct SQL equivalent: a row cannot drop one column on its own.',
+    explain:'<code>$unset</code> deletes the field. The value you give (<code>""</code>) is ignored.',
+    note:'Earth no longer has a <code>life</code> field.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$rename'], title:'Rename a field',
+    ask:'In <code>"Andromeda Galaxy"</code>, rename <code>distance_from_earth_ly</code> to <code>distance_ly</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Andromeda Galaxy" },\n  { $rename: { "distance_from_earth_ly": "distance_ly" } }\n)',
+    sql:'ALTER TABLE astronomy_data\nRENAME COLUMN distance_from_earth_ly TO distance_ly;',
+    explain:'<code>$rename</code> moves the value to the new field name — in this one document only, unlike SQL’s ALTER TABLE.',
+    note:'Only Andromeda changed; Proxima Centauri still has <code>distance_from_earth_ly</code>.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$inc'], title:'Increase Earth’s mass',
+    ask:'Increase the <code>mass_kg</code> of <code>"Earth"</code> by <code>1e20</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Earth" },\n  { $inc: { mass_kg: 1e20 } }\n)',
+    sql:"UPDATE astronomy_data\nSET mass_kg = mass_kg + 1e20\nWHERE name = 'Earth';",
+    explain:'<code>$inc</code> adds to a number (use a negative value to subtract). No need to read the old value first.',
+    note:'Earth is now 5.9721e+24 kg.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$mul'], title:'Double Jupiter',
+    ask:'Multiply the <code>mass_kg</code> of <code>"Jupiter"</code> by <code>2</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Jupiter" },\n  { $mul: { mass_kg: 2 } }\n)',
+    sql:"UPDATE astronomy_data\nSET mass_kg = mass_kg * 2\nWHERE name = 'Jupiter';",
+    explain:'<code>$mul</code> multiplies a number field by the given value.',
+    note:'Jupiter: 3.796e+27 kg.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$min'], title:'Lower to a minimum',
+    ask:'Set the CMB’s <code>temperature_K</code> to <code>2.5</code> — but only if that is <strong>lower</strong> than the current value. Use <code>$min</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Cosmic Microwave Background" },\n  { $min: { temperature_K: 2.5 } }\n)',
+    sql:"UPDATE astronomy_data\nSET temperature_K = 2.5\nWHERE name = 'Cosmic Microwave Background'\n  AND temperature_K > 2.5;",
+    explain:'<code>$min</code> writes the value only if it is smaller than the current one. Run it again and <code>modifiedCount</code> is 0.',
+    note:'2.726 → 2.5.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$max'], title:'Raise to a maximum',
+    ask:'Set Earth’s <code>mass_kg</code> to <code>6e24</code> if the current value is smaller. Use <code>$max</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Earth" },\n  { $max: { mass_kg: 6e24 } }\n)',
+    sql:"UPDATE astronomy_data\nSET mass_kg = 6e24\nWHERE name = 'Earth' AND mass_kg < 6e24;",
+    explain:'<code>$max</code> writes the value only if it is larger than the current one.',
+    note:'5.9721e+24 → 6e+24.' },
+  { group:'Field Update', kind:'update', method:'updateOne', ops:['$currentDate'], title:'Stamp the Sun',
+    ask:'Add a <code>lastUpdated</code> field holding the current date to <code>"Sun"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Sun" },\n  { $currentDate: { lastUpdated: true } }\n)',
+    sql:'-- No direct SQL equivalent for adding a field to one row.',
+    explain:'<code>$currentDate</code> sets the field to the server’s current time. <code>true</code> means a Date.',
+    note:'The Sun now has <code>lastUpdated: ISODate(…)</code>.' },
 
-  { group:'Create', title:'Insert in bulk',
-    story:'One is done. Then how does she insert in bulk? These four arrived together (one is a test entry she added by mistake).',
-    ask:'Insert all four products into <code>products</code> with <strong>one</strong> command:',
-    table:[['name','price','category','stock']].concat(fourItems),
-    answer:'db.products.insertMany([\n  { name: "Silver Ring", price: 800, category: "Ring", stock: 20 },\n  { name: "Diamond Ring", price: 5200, category: "Ring", stock: 5 },\n  { name: "Pearl Earrings", price: 1200, category: "Earrings", stock: 30 },\n  { name: "Test Bangle", price: 0, category: "Bangle", stock: 0 }\n]);',
-    explain:'<code>insertMany()</code> takes an <strong>array</strong> of documents (<code>[ {…}, {…} ]</code>) and inserts them in one round trip. <code>insertedIds</code> lists one <code>_id</code> per document.',
-    check:c=>{
-      const ins = called(c,'insertMany');
-      if (!ins.length){ return called(c,'insertOne').length ? 'That added one at a time. This question needs one <code>insertMany([ … ])</code> call. Click <em>Reset to this question</em> first.' : false; }
-      const g = gate(); if (g) return g;
-      const miss = fourItems.filter(x=>!hasItem(x));
-      if (!miss.length) return true;
-      return `Still missing or different: <code>${miss.map(x=>esc(x[0])).join('</code>, <code>')}</code>. Check spelling, numbers without quotes, and the category. Click <em>Reset to this question</em> to start clean.`;
-    },
-    note:'Five products in stock. Time to read them back.' },
+  /* ---------- STAGE 02.02 · Array update ---------- */
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$push'], title:'Give Mars a moon',
+    story:'<b>Stage 02.02</b> changes array fields without rewriting the whole array.',
+    ask:'Add the moon <code>"Phobos"</code> to <code>"Mars"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Mars" },\n  { $push: { moons: "Phobos" } }\n)',
+    sql:"UPDATE astronomy_data\nSET moons = JSON_ARRAY_APPEND(moons, '$', 'Phobos')\nWHERE name = 'Mars';",
+    explain:'<code>$push</code> appends to an array. Mars had no <code>moons</code> field, so it is created as <code>[ "Phobos" ]</code>.',
+    note:'Mars: <code>moons: [ \'Phobos\' ]</code>.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$push','$each','$sort','$slice'], title:'Push many, sort, limit',
+    ask:'Add <code>["Deimos","NewMoon"]</code> to Mars’s <code>moons</code>, sort them alphabetically, and keep at most <code>5</code>. Use <code>$push</code> with <code>$each</code>, <code>$sort</code> and <code>$slice</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Mars" },\n  { $push: { moons: {\n      $each: ["Deimos", "NewMoon"],\n      $sort: 1,\n      $slice: 5\n  } } }\n)',
+    sql:'-- SQL does not support arrays this way.',
+    explain:'<code>$each</code> pushes several values; <code>$sort: 1</code> sorts the whole array ascending; <code>$slice: 5</code> keeps the first 5.',
+    note:'Mars: <code>[ \'Deimos\', \'NewMoon\', \'Phobos\' ]</code>.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$addToSet'], title:'Add Earth if missing',
+    ask:'Add <code>"Earth"</code> to the Sun’s <code>planets</code> array — only if it isn’t already there.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Sun" },\n  { $addToSet: { planets: "Earth" } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$addToSet</code> adds a value only if the array doesn’t contain it. Run it a second time: <code>modifiedCount: 0</code>.',
+    note:'Earth joined the end of the list.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$pop'], title:'Remove the last planet',
+    ask:'Remove the <strong>last</strong> element of the Sun’s <code>planets</code> array.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Sun" },\n  { $pop: { planets: 1 } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$pop: 1</code> removes the last element.',
+    note:'The last element (Earth) is gone.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$pop'], title:'Remove the first planet',
+    ask:'Remove the <strong>first</strong> element of the Sun’s <code>planets</code> array.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Sun" },\n  { $pop: { planets: -1 } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$pop: -1</code> removes the first element.',
+    note:'Mercury is gone from the front.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$pull'], title:'Remove Europa',
+    ask:'Remove the moon <code>"Europa"</code> from <code>"Jupiter"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Jupiter" },\n  { $pull: { moons: "Europa" } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$pull</code> removes every element equal to the value (or matching a condition).',
+    note:'Jupiter: Io, Ganymede, Callisto.' },
+  { group:'Array Update', kind:'update', method:'updateOne', ops:['$pullAll'], title:'Remove Io and Callisto',
+    ask:'Remove the moons <code>"Io"</code> and <code>"Callisto"</code> from <code>"Jupiter"</code> in one operation.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Jupiter" },\n  { $pullAll: { moons: ["Io", "Callisto"] } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$pullAll</code> removes every element equal to any value in the list.',
+    note:'Jupiter: only Ganymede left.' },
 
-  { group:'Read', title:'Check all records',
-    story:'She wants to see the whole inventory.',
-    ask:'Show every document in <code>products</code>.',
-    answer:'db.products.find();',
-    explain:'<code>find()</code> with no filter (or <code>{}</code>) returns every document in the collection.',
-    check:c=>{
-      const f = called(c,'find','products');
-      if (!f.length) return false;
-      return gate() || (emptyFilter(f[0].args[0]) ? true : 'That used a filter. This question wants <strong>all</strong> records — call <code>find()</code> with no filter.');
-    },
-    note:'All five came back, each with its own <code>_id</code>.' },
+  /* ---------- STAGE 02.03 · Positional ---------- */
+  { group:'Positional', kind:'update', method:'updateOne', ops:['planets.$'], title:'Update the first planet',
+    story:'<b>Stage 02.03</b> updates an array element by its position.',
+    ask:'Update the first element of the Sun’s <code>planets</code> array to <code>"MercuryUpdated"</code>. Match <code>"planets.0"</code> in the filter and set <code>"planets.$"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Sun", "planets.0": { $exists: true } },\n  { $set: { "planets.$": "MercuryUpdated" } }\n)',
+    sql:'-- No direct SQL equivalent.',
+    explain:'<code>$</code> stands for the position the filter matched — here element <code>0</code>. Field paths with dots must be quoted.',
+    note:'The first planet is now <code>MercuryUpdated</code>.' },
 
-  { group:'Read', title:'Filter the records',
-    story:'A customer asks: “Which rings do you have?”',
-    ask:'Find only the products whose <code>category</code> is <code>"Ring"</code>.',
-    answer:'db.products.find({ category: "Ring" });',
-    explain:'The filter <code>{ category: "Ring" }</code> keeps only documents whose <code>category</code> equals <code>"Ring"</code>. Matching is case-sensitive.',
-    check:c=>{
-      const f = called(c,'find','products');
-      if (!f.length) return false;
-      const g = gate(); if (g) return g;
-      const flt = f[0].args[0];
-      if (eq(flt, {category:'Ring'})) return true;
-      if (isObj(flt) && typeof flt.category === 'string' && flt.category.toLowerCase() === 'ring') return 'Close! Values are case-sensitive: <code>"Ring"</code> with a capital R.';
-      return 'Filter on the <code>category</code> field: <code>{ category: "Ring" }</code>.';
-    },
-    note:'Two rings: Silver and Diamond.' },
+  /* ---------- STAGE 02.04 · Date ---------- */
+  { group:'Date', kind:'update', method:'updateOne', ops:['$currentDate','$type'], title:'Timestamp Earth',
+    story:'<b>Stage 02.04</b> — dates and timestamps.',
+    ask:'Add a <code>lastChecked</code> <strong>timestamp</strong> to <code>"Earth"</code>. Use <code>$currentDate</code> with <code>$type: "timestamp"</code>.',
+    answer:'db.astronomy_data.updateOne(\n  { name: "Earth" },\n  { $currentDate: { lastChecked: { $type: "timestamp" } } }\n)',
+    sql:'-- In SQL you cannot add a new column to one particular row.',
+    explain:'<code>{ $type: "timestamp" }</code> stores a BSON Timestamp instead of a Date.',
+    note:'Earth: <code>lastChecked: Timestamp({ t: …, i: 1 })</code>.' },
 
-  { group:'Update', title:'Update one price',
-    story:'Gold prices went up. She needs to change one product.',
-    ask:'Set the price of <code>"Gold Necklace"</code> to <code>3000</code>.',
-    answer:'db.products.updateOne(\n  { name: "Gold Necklace" },\n  { $set: { price: 3000 } }\n);',
-    explain:'<code>updateOne(filter, update)</code> changes the <strong>first</strong> matching document. <code>$set</code> changes only the fields you list and leaves the rest alone.',
-    check:c=>{
-      const u = called(c,'updateOne','products'), um = called(c,'updateMany','products');
-      if (!u.length && !um.length) return false;
-      const g = gate(); if (g) return g;
-      if (!u.length) return 'That works, but this question practises <code>updateOne</code>.';
-      const r = u[0].result;
-      if (r.matchedCount === 0) return '<code>matchedCount: 0</code> — the filter found nothing. Filter on <code>{ name: "Gold Necklace" }</code>.';
-      if (byName('Gold Necklace').some(d=>d.price === 3000)) return true;
-      return 'The filter matched, but the price isn’t <code>3000</code> (a number). Use <code>{ $set: { price: 3000 } }</code>.';
-    },
-    note:'<code>matchedCount: 1, modifiedCount: 1</code> — one found, one changed.' },
-
-  { group:'Update', title:'Update many prices',
-    story:'A ring promotion: every ring now sells at one flat price.',
-    ask:'Set <code>price</code> to <code>1500</code> for <strong>every</strong> product in category <code>"Ring"</code>, in one command.',
-    answer:'db.products.updateMany(\n  { category: "Ring" },\n  { $set: { price: 1500 } }\n);',
-    explain:'<code>updateMany()</code> applies the update to <strong>all</strong> documents that match the filter.',
-    check:c=>{
-      const um = called(c,'updateMany','products'), u = called(c,'updateOne','products');
-      if (!um.length && !u.length) return false;
-      const g = gate(); if (g) return g;
-      if (!um.length) return '<code>updateOne</code> changes just the first match. Use <code>updateMany</code> to reach every ring.';
-      const rings = docs().filter(d=>d.category === 'Ring');
-      if (rings.length >= 2 && rings.every(d=>d.price === 1500)) return true;
-      return 'Not every ring is at <code>1500</code> yet. Filter <code>{ category: "Ring" }</code>, update <code>{ $set: { price: 1500 } }</code>.';
-    },
-    note:'<code>matchedCount: 2, modifiedCount: 2</code> — both rings repriced.' },
-
-  { group:'Update', title:'Upsert',
-    story:'She isn’t sure the <em>Ruby Ring</em> was ever entered. If it’s there, update it; if not, create it.',
-    ask:'For <code>name: "Ruby Ring"</code>, set <code>price: 1800</code>, <code>category: "Ring"</code>, <code>stock: 12</code> — creating the document if it doesn’t exist. One command.',
-    answer:'db.products.updateOne(\n  { name: "Ruby Ring" },\n  { $set: { price: 1800, category: "Ring", stock: 12 } },\n  { upsert: true }\n);',
-    explain:'<code>{ upsert: true }</code> means “update if found, insert if not”. Nothing matched, so MongoDB built a new document from the filter (<code>name</code>) plus the <code>$set</code> fields.',
-    check:c=>{
-      const u = called(c,'updateOne','products').concat(called(c,'updateMany','products'));
-      if (!u.length) return false;
-      const g = gate(); if (g) return g;
-      const ups = u.some(x=>x.args[2] && x.args[2].upsert === true);
-      if (!ups) return '<code>matchedCount: 0</code> — Ruby Ring doesn’t exist, so nothing changed. Add a third argument: <code>{ upsert: true }</code>.';
-      if (byName('Ruby Ring').some(d=>d.price===1800 && d.category==='Ring' && d.stock===12)) return true;
-      return 'Ruby Ring exists now, but its values don’t match. Click <em>Reset to this question</em> and set all three fields in <code>$set</code>.';
-    },
-    note:'<code>upsertedCount: 1</code> and <code>insertedId</code> holds the new document’s <code>_id</code>.' },
-
-  { group:'Delete', title:'Delete one wrong product',
-    story:'Time to delete the wrong product: the test entry.',
-    ask:'Delete the product named <code>"Test Bangle"</code>.',
-    answer:'db.products.deleteOne({ name: "Test Bangle" });',
-    explain:'<code>deleteOne(filter)</code> removes the first document that matches the filter.',
-    check:c=>{
-      const d = called(c,'deleteOne','products'), dm = called(c,'deleteMany','products');
-      if (!d.length && !dm.length) return false;
-      const g = gate(); if (g) return g;
-      if (!d.length) return 'This question practises <code>deleteOne</code>. Click <em>Reset to this question</em> and try again.';
-      if (d[0].result.deletedCount === 0) return '<code>deletedCount: 0</code> — nothing matched. Filter on <code>{ name: "Test Bangle" }</code>.';
-      if (byName('Test Bangle').length) return 'Something was deleted, but the Test Bangle is still there. Check the filter.';
-      if (docs().length < 5) return 'The wrong product was removed. Click <em>Reset to this question</em> and filter on <code>{ name: "Test Bangle" }</code>.';
-      return true;
-    },
-    note:'<code>deletedCount: 1</code>. The test entry is gone.' },
-
-  { group:'Delete', title:'Delete by filter',
-    story:'She has discontinued her earrings line.',
-    ask:'Delete <strong>every</strong> product in category <code>"Earrings"</code>, and nothing else, in one command.',
-    answer:'db.products.deleteMany({ category: "Earrings" });',
-    explain:'<code>deleteMany(filter)</code> removes <strong>all</strong> documents that match the filter.',
-    check:c=>{
-      const dm = called(c,'deleteMany','products'), d = called(c,'deleteOne','products');
-      if (!dm.length && !d.length) return false;
-      const g = gate(); if (g) return g;
-      if (!dm.length) return 'Use <code>deleteMany</code> so every earring goes, even if there were several.';
-      if (!docs().length) return 'That emptied the whole collection! <code>{}</code> matches everything. Click <em>Reset to this question</em> and filter by category.';
-      if (docs().some(x=>x.category === 'Earrings')) return 'Earrings are still there. Filter <code>{ category: "Earrings" }</code>.';
-      if (docs().length < 4) return 'Something besides earrings was removed. Click <em>Reset to this question</em>.';
-      return true;
-    },
-    note:'Only the earrings went. Necklace and rings remain.' },
-
-  { group:'Delete', title:'Delete everything',
-    story:'End-of-season stocktake: she wants to clear every product but keep the <code>products</code> collection for new stock.',
-    ask:'Delete <strong>all</strong> documents in <code>products</code> — but keep the collection.',
-    answer:'db.products.deleteMany({});',
-    explain:'The empty filter <code>{}</code> matches every document, so <code>deleteMany({})</code> empties the collection. The collection and its indexes stay.',
-    check:c=>{
-      const dm = called(c,'deleteMany','products'), dr = called(c,'drop','products');
-      if (dr.length && !P()) return '<code>drop()</code> deleted the collection itself. Here the collection must stay. Click <em>Reset to this question</em>.';
-      if (!dm.length) return false;
-      const g = gate(); if (g) return g;
-      return (P() && !docs().length) ? true : 'Some documents remain. Use the empty filter <code>{}</code>.';
-    },
-    note:'The collection is empty but still exists — check with <code>show collections</code>.' },
-
-  { group:'Drop', title:'Drop a collection',
-    story:'She’ll rebuild the inventory from scratch, so the old collection can go completely.',
-    ask:'Drop the <code>products</code> collection.',
-    answer:'db.products.drop();',
-    explain:'<code>db.collectionName.drop()</code> removes the collection with all its documents and indexes. It returns <code>true</code> if the collection existed.',
-    check:c=>{
-      const dr = called(c,'drop');
-      if (!dr.length) return false;
-      const g = gate(); if (g) return g;
-      if (dr[0].coll !== 'products') return `You dropped <code>${esc(dr[0].coll)}</code>. Drop <code>products</code>.`;
-      return !P() ? true : false;
-    },
-    note:'<code>true</code> — dropped. (The database itself is gone too, because it now has no collections.)' },
-
-  { group:'Capped', title:'Create a capped collection',
-    story:'For the new inventory she wants a fixed size: never more than 500 KB or 1,000 products. When it’s full, the oldest documents roll off.',
-    ask:'Create a <strong>capped</strong> collection named <code>products</code> with <code>size: 500000</code> and <code>max: 1000</code>.',
-    answer:'db.createCollection("products", {\n  capped: true,\n  size: 500000,   // 500 KB\n  max: 1000       // optional: max number of documents\n});',
-    explain:'A capped collection has a fixed size and keeps insertion order. <code>size</code> (bytes) is required; <code>max</code> (document count) is optional. When it’s full, new inserts overwrite the oldest documents.',
-    check:c=>{
-      const mk = called(c,'createCollection');
-      if (!mk.length) return false;
-      const g = gate(); if (g) return g;
-      const p = P();
-      if (!p) return `You created <code>${esc(mk[0].coll)}</code>. Name it <code>products</code>.`;
-      if (!p.capped) return 'That’s a normal collection. Pass options: <code>{ capped: true, size: 500000, max: 1000 }</code>. Drop it first with <code>db.products.drop()</code>.';
-      if (p.size !== 500000 || p.max !== 1000) return 'It’s capped, but use <code>size: 500000</code> and <code>max: 1000</code>. Drop it and create it again.';
-      return true;
-    },
-    note:'Capped <code>products</code> is ready. The Data panel marks it <span style="color:#946F3F;font-weight:bold">capped</span>.' },
-
-  { group:'Capped', title:'Is it capped?',
-    story:'She wants the shell to confirm the new collection is capped.',
-    ask:'Ask MongoDB whether <code>products</code> is a capped collection.',
-    answer:'db.products.isCapped();',
-    explain:'<code>isCapped()</code> returns <code>true</code> for a capped collection and <code>false</code> otherwise.',
-    check:c=>{
-      const ic = called(c,'isCapped');
-      if (!ic.length) return false;
-      const g = gate(); if (g) return g;
-      if (ic[0].coll !== 'products') return 'Call it on <code>db.products</code>.';
-      return ic[0].result === true ? true : '<code>false</code> — <code>products</code> isn’t capped. Go back one question.';
-    },
-    note:'<code>true</code> — confirmed.' },
-
-  { group:'Drop', title:'Drop the database',
-    story:'Lab over. Clean up the cluster.',
-    ask:'Drop the entire <code>LusciousJewels</code> database.',
-    answer:'db.dropDatabase();',
-    explain:'<code>db.dropDatabase()</code> deletes the <strong>current</strong> database with all its collections. Check the prompt to make sure you’re in the right one first.',
-    check:c=>{
-      if (!called(c,'dropDatabase').length) return false;
-      if (c.value && c.value.dropped !== 'LusciousJewels') return `That dropped <code>${esc(c.value.dropped)}</code>. Switch with <code>use LusciousJewels</code> and run it again.`;
-      return !S.dbs.LusciousJewels;
-    },
-    note:'<code>{ ok: 1, dropped: \'LusciousJewels\' }</code>. Thank you!' }
+  /* ---------- STAGE 02.05 · Replace ---------- */
+  { group:'Replace', kind:'update', method:'replaceOne', title:'Replace the CMB',
+    story:'<b>Stage 02.05</b> — replace a whole document.',
+    ask:'Replace the <code>"Cosmic Microwave Background"</code> document with <code>{ name: "CMB", type: "Radiation", temperature_K: 2.725, origin: "Big Bang" }</code>.',
+    answer:'db.astronomy_data.replaceOne(\n  { name: "Cosmic Microwave Background" },\n  { name: "CMB", type: "Radiation", temperature_K: 2.725, origin: "Big Bang" }\n)',
+    sql:"DELETE FROM astronomy_data\nWHERE name = 'Cosmic Microwave Background';\nINSERT INTO astronomy_data (name, type, temperature_K, origin)\nVALUES ('CMB', 'Radiation', 2.725, 'Big Bang');",
+    explain:'<code>replaceOne</code> swaps the whole document for the new one, keeping only <code>_id</code>. No <code>$</code> operators allowed in the replacement.',
+    note:'Same <code>_id</code>, completely new body. Mission complete!' }
 ];
 
 (window.CHAPTERS = window.CHAPTERS || []).push({
-  id: 'ch02', num: '02', title: 'CRUD Operations', href: 'index.html', story: 'Luscious Jewels',
-  key: 'lj-atlas-shell-lab-v1',
-  host: 'Atlas atlas-lj7k2q-shard-0 [primary]',
-  cluster: 'lusciousjewels.lj7k2q.mongodb.net',
-  startNote: 'fresh cluster',
+  id: 'ch02', num: '02', title: 'Update & Query Operators', href: 'chapter02.html', story: 'Mission Mongo',
+  key: 'mission-mongo-ch03-v1',
+  host: 'Atlas atlas-mm3k9x-shard-0 [primary]',
+  cluster: 'missionmongo.mm3k9x.mongodb.net',
+  db: 'MissionMongo',
+  coll: 'astronomy_data',
+  colOrder: ['name','type','mass_kg','distance_from_sun_km','temperature_K','moons','planets','parent','life','distance_from_earth_ly','distance_ly','origin','lastUpdated','lastChecked'],
+  startNote: 'astronomy_data loaded — 12 documents',
   dataset: {
-    db: 'LusciousJewels', coll: 'products',
-    docs: [{ name:'Gold Necklace', price:2500, category:'Necklace', stock:15 }].concat(fourItems.map(([name,price,category,stock])=>({ name, price, category, stock }))),
-    note: 'The Luscious Jewels inventory as it stands after Question 6 (one insertOne plus the insertMany batch). Load it to practise the read, update and delete questions in a real shell.'
+    db: 'MissionMongo', coll: 'astronomy_data', docs: UNIVERSE,
+    note: 'The 12-object universe every Mission Mongo question starts from. The update questions build on each other, so reload it to start again.'
   },
-  tasks: CH02_TASKS,
+  init(){
+    const docs = UNIVERSE.map((d,i)=>prepDoc(Object.assign({ _id: new ObjectId('6650c0de' + (i+1).toString(16).padStart(16,'0')) }, d)));
+    return { cur:'MissionMongo', dbs:{ MissionMongo:{ colls:{ astronomy_data:{ docs, capped:false } } } } };
+  },
+  tasks: CH03_TASKS,
   finish: {
-    tag: 'Chapter 02 complete', title: 'Thank you!',
-    text: `You ran all ${CH02_TASKS.length} CRUD operations for Luscious Jewels on the Atlas shell.`,
-    note: 'Create → Read → Update → Delete → Drop → Capped → Upsert.'
+    tag: 'Chapter 02 complete', title: 'Mission completed',
+    text: `You ran all ${CH03_TASKS.length} query and update operators from Mission Mongo.`,
+    note: 'Comparison → Logical → Array → Regex → Field, Array, Positional and Date updates → Replace.'
   }
 });
