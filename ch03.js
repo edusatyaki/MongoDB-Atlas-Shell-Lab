@@ -160,7 +160,7 @@ const CH03_TASKS = [
     story:'Instead of two queries, <code>$lookup</code> joins referenced documents in one <code>aggregate</code> pipeline — MongoDB’s LEFT OUTER JOIN.',
     ask:'For <code>"Ramesses II"</code> only, join his battles: <code>$match</code> the pharaoh, then <code>$lookup</code> from <code>battles</code> with <code>localField: "battle_ids"</code>, <code>foreignField: "_id"</code>, <code>as: "battles"</code>.',
     answer:'db.pharaohs.aggregate([\n  { $match: { name: "Ramesses II" } },\n  { $lookup: {\n      from: "battles",\n      localField: "battle_ids",\n      foreignField: "_id",\n      as: "battles"\n  } }\n])',
-    explain:'<code>$lookup</code> finds every battle whose <code>_id</code> is in <code>battle_ids</code> and embeds the matches as the new array <code>battles</code> — in the result only; the stored data doesn’t change.',
+    explain:'<code>$lookup</code> finds every battle whose <code>_id</code> is in <code>battle_ids</code> and embeds the matches as the new array <code>battles</code> — in the result only; the stored data doesn’t change. The order inside that array isn’t guaranteed.',
     note:'Ramesses II with his three battle documents attached.' },
   { group:'Joining ($lookup)', kind:'agg', coll:'gods', ops:['$lookup'], title:'Join temples into every god',
     ask:'For <strong>every</strong> god, join the temple documents: <code>$lookup</code> from <code>temples</code>, <code>localField: "temples"</code>, <code>foreignField: "_id"</code>, <code>as: "temple_docs"</code>.',

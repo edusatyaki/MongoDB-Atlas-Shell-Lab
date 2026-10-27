@@ -90,7 +90,7 @@ function renderQ(){
       <button class="btn${done.has(idx)?'':' primary'}" id="rev" type="button">${revealed ? 'Hide answer' : 'Show answer'}</button>
       ${idx>0 ? '<button class="btn" id="rst" type="button" title="Rebuild the data as if every earlier question was answered correctly">↺ Reset to this question</button>' : ''}
     </div>
-    ${revealed ? `<div class="reveal"><div class="codebox"><pre>${esc(t.answer)}</pre><button type="button" class="copy" data-copy="answer">Copy</button></div><p>${t.explain}</p>${t.sql ? `<div class="sql"><span>SQL equivalent</span><div class="codebox"><pre>${esc(t.sql)}</pre><button type="button" class="copy" data-copy="sql">Copy</button></div></div>` : ''}</div>` : ''}`;
+    ${revealed ? `<div class="reveal"><div class="codebox"><pre>${esc(t.answer)}</pre><button type="button" class="copy" data-copy="answer">Copy</button></div><p>${t.explain}</p>${t.sql ? `<div class="sql"><span>SQL equivalent · PostgreSQL</span><div class="codebox"><pre>${esc(t.sql)}</pre><button type="button" class="copy" data-copy="sql">Copy</button></div></div>` : ''}</div>` : ''}`;
   $('rev').onclick = ()=>{ revealed = !revealed; renderQ(); };
   q.querySelectorAll('.copy').forEach(b=> b.onclick = ()=> copyText(t[b.dataset.copy], b));
   if ($('rst')) $('rst').onclick = ()=>{ goTo(idx, true); };

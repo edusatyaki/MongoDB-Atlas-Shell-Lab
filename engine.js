@@ -143,7 +143,7 @@ function positionalIndex(d, field, f){
     if (k === field){ const arr = getPath(d,field), v = f[k]; if (!Array.isArray(arr)) continue; const i = arr.findIndex(e => isOpObj(v) ? opsPass(v,e) : eqOrHas(e,v)); if (i >= 0) return i; }
     else if (k.startsWith(field + '.')){
       const rest = k.slice(field.length+1);
-      if (/^\d+$/.test(rest.split('.')[0])) return +rest.split('.')[0];
+      if (/^\d+$/.test(rest.split('.')[0])) continue;   // an index path records no positional match (real MongoDB errors)
       const arr = getPath(d,field); if (!Array.isArray(arr)) continue;
       const i = arr.findIndex(e => isObj(e) && match(e, { [rest]: f[k] })); if (i >= 0) return i;
     }
