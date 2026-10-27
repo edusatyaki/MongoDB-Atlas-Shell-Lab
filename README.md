@@ -11,6 +11,7 @@ A browser simulator of the MongoDB Atlas shell (mongosh) for practising MongoDB,
 | [Ch 01 · CRUD Operations](https://edusatyaki.github.io/MongoDB-Atlas-Shell-Lab/) | Luscious Jewels — D. Soni's jewellery inventory | 18 | `use`, `show dbs`, `createCollection`, `insertOne/Many`, `find`, `updateOne/Many`, upsert, `deleteOne/Many`, `drop`, capped collections, `dropDatabase` |
 | [Ch 02 · Update & Query Operators](https://edusatyaki.github.io/MongoDB-Atlas-Shell-Lab/chapter02.html) | Mission Mongo — an `astronomy_data` universe | 33 | comparison, logical, array and regex query operators; field, array, positional and date update operators; `replaceOne` — each with its SQL equivalent |
 | [Ch 03 · Embedding & Referencing](https://edusatyaki.github.io/MongoDB-Atlas-Shell-Lab/chapter03.html) | Ancient Egypt — pharaohs, battles, pyramids, gods and temples | 19 | embedded documents and arrays, dot notation, 1 → 1 / 1 → Few / 1 → Many / Many ↔ Many, references by `_id`, `$in`, two-way links, joining with `aggregate` + `$lookup` |
+| [Ch 04 · Aggregation Pipeline](https://edusatyaki.github.io/MongoDB-Atlas-Shell-Lab/chapter04.html) | Data Factory — the campus store's users, orders and products | 16 | pipeline stages, `$match`, `$count`, `$sort`, `$limit`, `$group` with `$sum` / `$avg` / `$min` / `$max`, `_id: null` totals, `$lookup` joins, and the combined join → group → sort — each with its SQL equivalent |
 
 ## How it works
 
@@ -34,10 +35,10 @@ python3 -m http.server 8136
 
 ## Files
 
-- `engine.js` — the mini mongosh engine: query matching, update operators, `aggregate` (`$match`, `$lookup`, `$unwind`, `$project`, `$sort`, `$limit`, `$count`), mongosh-style printing
+- `engine.js` — the mini mongosh engine: query matching, update operators, `aggregate` (`$match`, `$group`, `$lookup`, `$unwind`, `$project`, `$addFields`, `$sort`, `$limit`, `$skip`, `$count`, with `$sum` / `$avg` / `$min` / `$max` / `$push` accumulators and basic expressions), mongosh-style printing
 - `lab.js`, `lab.css` — the question/shell/data interface shared by every chapter
-- `ch01.js`, `ch02.js`, `ch03.js` — each chapter's dataset and questions
-- `index.html` (Chapter 01), `chapter02.html` (Chapter 02), `chapter03.html` (Chapter 03)
+- `ch01.js` … `ch04.js` — each chapter's dataset and questions
+- `index.html` (Chapter 01), `chapter02.html`, `chapter03.html`, `chapter04.html`
 
 ---
 

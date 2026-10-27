@@ -247,6 +247,79 @@ function pushDoc(c, d, collName){
 }
 const need = (v, pos, m) => { if (v === undefined) throw new ShellErr('MongoshInvalidInputError', `[COMMON-10001] Missing required argument at position ${pos} (${m})`); };
 
+/* aggregation expressions: "$field" paths, literals, and a few operators */
+function evalExpr(e, d){
+  if (typeof e === 'string' && e[0] === '$' && e[1] !== '$'){ const v = getPath(d, e.slice(1)); return v === undefined ? null : v; }
+  if (Array.isArray(e)) return e.map(x=>evalExpr(x,d));
+  if (isObj(e)){
+    const ks = Object.keys(e);
+    if (ks.length === 1 && ks[0][0] === '$'){
+      const op = ks[0], raw = e[op], args = Array.isArray(raw) ? raw.map(x=>evalExpr(x,d)) : [evalExpr(raw,d)];
+      const nums = () => args.map(v=>{ if (typeof v !== 'number') throw new ShellErr('MongoServerError', `${op} only supports numeric types, not ${v === null ? 'null' : typeof v}`); return v; });
+      switch(op){
+        case '$add': return nums().reduce((a,b)=>a+b,0);
+        case '$subtract': { const [a,b] = nums(); return a-b; }
+        case '$multiply': return nums().reduce((a,b)=>a*b,1);
+        case '$divide': { const [a,b] = nums(); if (b === 0) throw new ShellErr('MongoServerError','can\'t $divide by zero'); return a/b; }
+        case '$round': { const [v, p] = args; const f = Math.pow(10, p || 0); return Math.round(v*f)/f; }
+        case '$size': { if (!Array.isArray(args[0])) throw new ShellErr('MongoServerError','The argument to $size must be an array'); return args[0].length; }
+        case '$sum': return (Array.isArray(args[0]) && args.length === 1 ? args[0] : args).reduce((a,v)=>a+(typeof v === 'number' ? v : 0),0);
+        case '$concat': return args.some(v=>v === null) ? null : args.map(String).join('');
+        case '$toUpper': return args[0] === null ? '' : String(args[0]).toUpperCase();
+        case '$toLower': return args[0] === null ? '' : String(args[0]).toLowerCase();
+        default: throw new ShellErr('MongoServerError', `Unrecognized expression '${op}'`);
+      }
+    }
+    const o = {}; ks.forEach(k=>{ o[k] = evalExpr(e[k], d); }); return o;
+  }
+  return e;
+}
+function groupStage(docs, spec){
+  if (!isObj(spec) || !('_id' in spec)) throw new ShellErr('MongoServerError', 'a group specification must include an _id');
+  const groups = new Map();
+  docs.forEach(d=>{ const key = evalExpr(spec._id, d), k = canon(key); if (!groups.has(k)) groups.set(k, { _id:key, rows:[] }); groups.get(k).rows.push(d); });
+  return [...groups.values()].map(g=>{
+    const o = { _id: g._id };
+    for (const f in spec){
+      if (f === '_id') continue;
+      const acc = spec[f];
+      if (!isObj(acc) || Object.keys(acc).length !== 1 || Object.keys(acc)[0][0] !== '$') throw new ShellErr('MongoServerError', `The field '${f}' must be an accumulator object`);
+      const op = Object.keys(acc)[0];
+      const vals = op === '$count' ? [] : g.rows.map(r=>evalExpr(acc[op], r));
+      const present = vals.filter(v=>v !== null && v !== undefined);
+      const nums = vals.filter(v=>typeof v === 'number');
+      switch(op){
+        case '$sum': o[f] = nums.reduce((a,b)=>a+b,0); break;
+        case '$avg': o[f] = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null; break;
+        case '$min': o[f] = present.length ? present.reduce((a,b)=>b<a?b:a) : null; break;
+        case '$max': o[f] = present.length ? present.reduce((a,b)=>b>a?b:a) : null; break;
+        case '$count': o[f] = g.rows.length; break;
+        case '$push': o[f] = vals; break;
+        case '$addToSet': o[f] = vals.filter((v,i)=>vals.findIndex(w=>eq(w,v)) === i); break;
+        case '$first': o[f] = vals.length ? vals[0] : null; break;
+        case '$last': o[f] = vals.length ? vals[vals.length-1] : null; break;
+        default: throw new ShellErr('MongoServerError', `unknown group operator '${op}'`);
+      }
+    }
+    return o;
+  });
+}
+function projectStage(d, spec){
+  if (!isObj(spec) || !Object.keys(spec).length) throw new ShellErr('MongoServerError', '$project requires at least one output field');
+  const ks = Object.keys(spec).filter(k=>k !== '_id');
+  if (ks.length && ks.every(k=>spec[k] === 0 || spec[k] === false)) return project(d, spec);   // exclusion mode
+  const o = {};
+  if (spec._id === undefined || spec._id === 1 || spec._id === true) o._id = d._id;
+  else if (spec._id !== 0 && spec._id !== false) o._id = evalExpr(spec._id, d);
+  ks.forEach(k=>{
+    const v = spec[k];
+    if (v === 1 || v === true){ const x = getPath(d,k); if (x !== undefined) setPath(o,k,clone(x)); }
+    else if (v === 0 || v === false) throw new ShellErr('MongoServerError', `Invalid $project :: caused by :: Cannot do exclusion on field ${k} in inclusion projection`);
+    else setPath(o, k, evalExpr(v, d));
+  });
+  return o;
+}
+
 class Cursor {
   constructor(d){ this.d = d; }
   sort(s){ const ks = Object.keys(s||{}); this.d.sort((a,b)=>{ for (const k of ks){ const x=getPath(a,k), y=getPath(b,k); if (x<y) return -s[k]; if (x>y) return s[k]; } return 0; }); return this; }
@@ -366,11 +439,13 @@ function collApi(name){
             docs = docs.flatMap(d=>{ const v = getPath(d,p); return Array.isArray(v) ? v.map(x=>{ const o = clone(d); setPath(o,p,clone(x)); return o; }) : (v === undefined ? [] : [d]); });
             break;
           }
-          case '$project': docs = docs.map(d=>project(d,spec)); break;
-          case '$sort': docs = sortVals(docs, spec); break;
+          case '$project': docs = docs.map(d=>projectStage(d,spec)); break;
+          case '$addFields': case '$set': docs = docs.map(d=>{ const o = clone(d); Object.keys(spec).forEach(k=>setPath(o,k,evalExpr(spec[k],d))); return o; }); break;
+          case '$group': docs = groupStage(docs, spec); break;
+          case '$sort': if (!isObj(spec) || !Object.values(spec).every(v=>v === 1 || v === -1)) throw new ShellErr('MongoServerError','$sort key ordering must be 1 (for ascending) or -1 (for descending)'); docs = sortVals(docs, spec); break;
           case '$limit': docs = docs.slice(0, spec); break;
           case '$skip': docs = docs.slice(spec); break;
-          case '$count': docs = [{ [spec]: docs.length }]; break;
+          case '$count': if (typeof spec !== 'string' || !spec) throw new ShellErr('MongoServerError','the count field must be a non-empty string'); docs = [{ [spec]: docs.length }]; break;
           default: throw new ShellErr('MongoServerError', `Unrecognized pipeline stage name: '${op}'`);
         }
       });

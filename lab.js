@@ -245,10 +245,14 @@ function autoCheck(t, r, before){
     const ids = a => a.map(d=>canon(d._id)).sort().join('|');
     const full = a => a.map(d=>canon(d, true)).sort().join('|');
     if (ids(call.result) === ids(exp)){
-      if (t.kind === 'agg' && full(call.result) !== full(exp)) return 'The right documents came back, but their shape differs from the answer. Check the <code>$lookup</code> fields: <code>from</code>, <code>localField</code>, <code>foreignField</code> and <code>as</code>.';
+      const seq = a => a.map(d=>canon(d, true)).join('|');
+      if (t.ordered && seq(call.result) !== seq(exp) && full(call.result) === full(exp)) return 'Right documents, wrong order. Check your <code>$sort</code>: <code>1</code> is ascending, <code>-1</code> descending — and which stage comes first.';
+      if (t.kind === 'agg' && full(call.result) !== full(exp)) return t.shapeHint || 'The right documents came back, but their fields or values differ from the answer. Compare the output with the question: field names, accumulators and the <code>$lookup</code> settings.';
       const miss = missingOps(call.args, t.ops);
       return miss ? `Right documents! Now write it the way this question practises — use ${miss}.` : true;
     }
+    const lit = t.kind === 'agg' && Array.isArray(call.args[0]) && call.args[0].find(st=>isObj(st) && isObj(st.$group) && typeof st.$group._id === 'string' && st.$group._id[0] !== '$');
+    if (lit) return `Grouping key <code>_id: "${esc(lit.$group._id)}"</code> is a plain string, so every document lands in one group. Add a <code>$</code> to mean “the value of the field”: <code>_id: "$${esc(lit.$group._id)}"</code>.`;
     const g = new Set(names(call.result)), e = new Set(names(exp));
     const lack = [...e].filter(x=>!g.has(x)), extra = [...g].filter(x=>!e.has(x));
     return `Your query returned <b>${call.result.length}</b> document${call.result.length === 1 ? '' : 's'}; the answer returns <b>${exp.length}</b>.`
