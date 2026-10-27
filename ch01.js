@@ -16,7 +16,7 @@ const fourItems = [
 ];
 const hasItem = ([n,p,c,s]) => byName(n).some(d=>d.price===p && d.category===c && d.stock===s);
 
-const CH02_TASKS = [
+const CH01_TASKS = [
   { group:'Database', title:'Pick a database',
     story:'<b>D. Soni</b> runs Luscious Jewels, a growing jewellery brand. She doesn’t just want to manage jewellery — she wants to manage her data too, and she needs your help.',
     ask:'Switch the shell to a database called <code>LusciousJewels</code>.',
@@ -290,10 +290,10 @@ const CH02_TASKS = [
     docs: [{ name:'Gold Necklace', price:2500, category:'Necklace', stock:15 }].concat(fourItems.map(([name,price,category,stock])=>({ name, price, category, stock }))),
     note: 'The Luscious Jewels inventory as it stands after Question 6 (one insertOne plus the insertMany batch). Load it to practise the read, update and delete questions in a real shell.'
   },
-  tasks: CH02_TASKS,
+  tasks: CH01_TASKS,
   finish: {
     tag: 'Chapter 01 complete', title: 'Thank you!',
-    text: `You ran all ${CH02_TASKS.length} CRUD operations for Luscious Jewels on the Atlas shell.`,
+    text: `You ran all ${CH01_TASKS.length} CRUD operations for Luscious Jewels on the Atlas shell.`,
     note: 'Create → Read → Update → Delete → Drop → Capped → Upsert.'
   }
 });

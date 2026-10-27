@@ -115,7 +115,8 @@ function renderData(){
   if (!c.docs.length){ body.innerHTML = `<div class="empty">Collection <b>${esc(dataColl)}</b> exists and is empty.</div>`; return; }
   const cols = ['_id'].concat(CH.colOrder || []); c.docs.forEach(x=>Object.keys(x).forEach(k=>{ if (!cols.includes(k)) cols.push(k); }));
   for (let i=cols.length-1;i>=0;i--) if (!c.docs.some(x=>cols[i] in x)) cols.splice(i,1);
-  const cell = v => v === undefined ? '' : (v instanceof ObjectId ? '…' + v.h.slice(-6) : esc(typeof v === 'object' ? R(v,0,false)[0] : typeof v === 'string' ? (/^\s*-?\d+(\.\d+)?\s*$/.test(v) ? `"${v}"` : v) : typeof v === 'number' && Math.abs(v) >= 1e15 ? v.toExponential().replace('e+','e') : String(v)));
+  const cell = v => { const t = cellText(v); return t.length > 64 ? `<span title="${esc(t).replace(/"/g,'&quot;')}">${esc(t.slice(0,61))}…</span>` : esc(t); };
+  const cellText = v => v === undefined ? '' : v instanceof ObjectId ? '…' + v.h.slice(-6) : typeof v === 'object' ? R(v,0,false)[0] : typeof v === 'string' ? (/^\s*-?\d+(\.\d+)?\s*$/.test(v) ? `"${v}"` : v) : typeof v === 'number' && Math.abs(v) >= 1e15 ? v.toExponential().replace('e+','e') : String(v);
   body.innerHTML = `<table><tr>${cols.map(k=>`<th>${esc(k)}</th>`).join('')}</tr>${c.docs.map(x=>`<tr class="${flashIds.has(canon(x._id))?'flash':''}">${cols.map(k=>`<td class="${k==='_id'?'id':''}">${cell(x[k])}</td>`).join('')}</tr>`).join('')}</table>`;
 }
 function renderAll(){ renderOutline(); renderQ(); renderNav(); renderData(); setPrompt(); }
@@ -147,6 +148,8 @@ function run(src){
   const before = cloneState(S);
   const r = execute(src);
   if (r.html) line(r.html);
+  const touched = r.calls.filter(x=>x.coll && S.dbs[S.cur] && S.dbs[S.cur].colls[x.coll]).pop();
+  if (touched) dataColl = touched.coll;
   if (!finished && !done.has(idx)){
     let verdict = false;
     try { verdict = TASKS[idx].check ? TASKS[idx].check(r) : autoCheck(TASKS[idx], r, before); } catch(e){ console.error(e); verdict = false; }
@@ -175,9 +178,16 @@ function docLit(d, multi){
   if (!multi) return '  ' + jsLit(d);
   return '  {\n' + Object.keys(d).map(k=>`    ${k}: ${jsLit(d[k])}`).join(',\n') + '\n  }';
 }
+const dsColls = ds => ds.collections || { [ds.coll]: ds.docs };
+const dsCount = ds => Object.values(dsColls(ds)).reduce((n,d)=>n+d.length,0);
 function datasetCode(c){
-  const ds = c.dataset;
-  return `// Chapter ${c.num} · ${c.title} — ${c.story}\n// Paste into the Atlas shell or mongosh. Re-running it starts clean.\n\nuse ${ds.db}\n\ndb.${ds.coll}.drop();\n\ndb.${ds.coll}.insertMany([\n${ds.docs.map(d=>docLit(d, ds.docs.some(x=>jsLit(x).length > 94))).join(',\n')}\n]);\n\ndb.${ds.coll}.countDocuments();   // ${ds.docs.length}`;
+  const ds = c.dataset, cols = dsColls(ds);
+  const blocks = Object.keys(cols).map(n=>{
+    const docs = cols[n], multi = docs.some(x=>jsLit(x).length > 94);
+    return `db.${n}.drop();\ndb.${n}.insertMany([\n${docs.map(d=>docLit(d, multi)).join(',\n')}\n]);`;
+  });
+  const counts = Object.keys(cols).map(n=>`db.${n}.countDocuments();   // ${cols[n].length}`).join('\n');
+  return `// Chapter ${c.num} · ${c.title} — ${c.story}\n// Paste into the Atlas shell or mongosh. Re-running it starts clean.\n\nuse ${ds.db}\n\n${blocks.join('\n\n')}\n\n${counts}`;
 }
 function openDataset(c){
   let m = $('dsModal');
@@ -189,7 +199,8 @@ function openDataset(c){
   }
   const code = datasetCode(c);
   $('dsTag').textContent = `Chapter ${c.num} · Dataset`;
-  $('dsTitle').textContent = `${c.dataset.db}.${c.dataset.coll} — ${c.dataset.docs.length} documents`;
+  const nc = Object.keys(dsColls(c.dataset)).length;
+  $('dsTitle').textContent = nc > 1 ? `${c.dataset.db} — ${nc} collections, ${dsCount(c.dataset)} documents` : `${c.dataset.db}.${Object.keys(dsColls(c.dataset))[0]} — ${dsCount(c.dataset)} documents`;
   $('dsNote').textContent = c.dataset.note;
   $('dsCode').textContent = code;
   $('dsCopy').onclick = ()=> copyText(code, $('dsCopy'));
@@ -214,18 +225,27 @@ function missingOps(args, ops){
   if (!miss.length) return null;
   return miss.map(o=>`<code>${esc((Array.isArray(o) ? o[0] : o))}</code>`).join(' and ');
 }
-const collDocs = st => { const d = st.dbs[CH.db]; const c = d && d.colls[CH.coll]; return c ? c.docs : null; };
-const names = a => a.map(d=>d.name === undefined ? '…'+d._id.h.slice(-6) : d.name);
+const dbState = st => { const d = st.dbs[CH.db]; return d ? Object.keys(d.colls).sort().map(n=>[n, d.colls[n].docs]) : null; };
+const label = d => d.name !== undefined ? String(d.name) : d.country !== undefined ? String(d.country) : d._id instanceof ObjectId ? '…' + d._id.h.slice(-6) : String(d._id);
+const names = a => a.map(label);
 function autoCheck(t, r, before){
-  const mine = r.calls.filter(x=>x.coll === CH.coll);
+  const coll = t.coll || CH.coll;
+  const mine = r.calls.filter(x=>x.coll === coll);
   if (S.cur !== CH.db && r.calls.length) return `You’re in <code>${esc(S.cur)}</code>. Switch back with <code>use ${CH.db}</code>.`;
-  if (t.kind === 'find'){
-    const f = mine.filter(x=>x.method === 'find');
-    if (!f.length) return r.calls.some(x=>x.method === 'find') ? `Query the <code>${CH.coll}</code> collection.` : false;
+  if (t.kind === 'find' || t.kind === 'agg'){
+    const m = t.kind === 'find' ? 'find' : 'aggregate';
+    const f = mine.filter(x=>x.method === m);
+    if (!f.length){
+      if (r.calls.some(x=>x.method === m)) return `Run it on the <code>${coll}</code> collection.`;
+      if (t.kind === 'agg' && mine.some(x=>x.method === 'find')) return 'This question practises <code>aggregate([ … ])</code> with a <code>$lookup</code> stage.';
+      return false;
+    }
     const call = f[f.length-1];
-    const exp = expectedFrom(before, t.answer).r.calls.find(x=>x.method === 'find').result;
+    const exp = expectedFrom(before, t.answer).r.calls.filter(x=>x.method === m && x.coll === coll).pop().result;
     const ids = a => a.map(d=>canon(d._id)).sort().join('|');
+    const full = a => a.map(d=>canon(d, true)).sort().join('|');
     if (ids(call.result) === ids(exp)){
+      if (t.kind === 'agg' && full(call.result) !== full(exp)) return 'The right documents came back, but their shape differs from the answer. Check the <code>$lookup</code> fields: <code>from</code>, <code>localField</code>, <code>foreignField</code> and <code>as</code>.';
       const miss = missingOps(call.args, t.ops);
       return miss ? `Right documents! Now write it the way this question practises — use ${miss}.` : true;
     }
@@ -235,19 +255,21 @@ function autoCheck(t, r, before){
       + (lack.length ? ` Missing: <code>${lack.map(esc).join('</code>, <code>')}</code>.` : '')
       + (extra.length ? ` Shouldn’t be there: <code>${extra.map(esc).join('</code>, <code>')}</code>.` : '');
   }
-  // update / replace
-  const w = mine.filter(x=>/^(update|replace)/.test(x.method));
-  if (!w.length) return r.calls.some(x=>/^(insert|delete|drop|update|replace)/.test(x.method)) ? `That changed different data. Click <em>Reset to this question</em>, then use <code>${t.method}</code> on <code>${CH.coll}</code>.` : false;
+  // writes: update / replace / insert
+  const w = mine.filter(x=>/^(update|replace|insert)/.test(x.method));
+  if (!w.length) return r.calls.some(x=>/^(insert|delete|drop|update|replace)/.test(x.method)) ? `That changed different data. Click <em>Reset to this question</em>, then use <code>${t.method}</code> on <code>${coll}</code>.` : false;
   const last = w[w.length-1];
   const ex = expectedFrom(before, t.answer);
-  if (canon(collDocs(S), true) === canon(collDocs(ex.st), true)){
+  if (canon(dbState(S), true) === canon(dbState(ex.st), true)){
     if (last.method !== t.method) return `The data is right, but this question practises <code>${t.method}</code>. Click <em>Reset to this question</em> and try it that way.`;
     const miss = missingOps(last.args, t.ops);
     return miss ? `The data is right, but use ${miss} as the question asks. Click <em>Reset to this question</em> and try again.` : true;
   }
-  if (last.result.matchedCount === 0) return '<code>matchedCount: 0</code> — the filter found no document. Check the name: spelling and capital letters matter.';
-  if (last.result.modifiedCount === 0) return '<code>modifiedCount: 0</code> — the document was found but nothing changed. Check the operator and the field name.' + (t.zeroHint ? ' ' + t.zeroHint : '');
-  return 'The document changed, but not the way the question asks. Compare it in the Data panel, then click <em>Reset to this question</em> and try again.';
+  if (last.result && last.result.matchedCount === 0 && !last.result.upsertedCount) return '<code>matchedCount: 0</code> — the filter found no document. Check the name: spelling and capital letters matter.';
+  if (last.result && last.result.modifiedCount === 0 && !last.result.upsertedCount) return '<code>modifiedCount: 0</code> — the document was found but nothing changed. Check the operator and the field name.' + (t.zeroHint ? ' ' + t.zeroHint : '');
+  return /^insert/.test(last.method)
+    ? 'A document went in, but it doesn’t match what the question asks. Compare it in the Data panel, then click <em>Reset to this question</em> and try again.' + (t.diffHint ? ' ' + t.diffHint : '')
+    : 'The document changed, but not the way the question asks. Compare it in the Data panel, then click <em>Reset to this question</em> and try again.' + (t.diffHint ? ' ' + t.diffHint : '');
 }
 
 /* input handling */

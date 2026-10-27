@@ -42,9 +42,9 @@ function clone(v){
   if (isObj(v)){ const o = {}; for (const k in v) o[k] = clone(v[k]); return o; }
   return v;
 }
-// loose: dates and timestamps compare by type only (their value is "now")
+// loose: dates, timestamps and ObjectIds compare by type only (their value is generated)
 function canon(v, loose){
-  if (v instanceof ObjectId) return 'oid:'+v.h;
+  if (v instanceof ObjectId) return loose ? 'oid' : 'oid:'+v.h;   // loose: generated ids differ run to run
   if (v instanceof Date) return loose ? 'date' : 'date:'+v.getTime();
   if (v instanceof Timestamp) return loose ? 'ts' : 'ts:'+v.t+':'+v.i;
   if (v instanceof RegExp) return 're:'+String(v);
@@ -56,6 +56,21 @@ const eq = (a,b) => canon(a) === canon(b);
 const reHit = (re, dv) => Array.isArray(dv) ? dv.some(x=>typeof x === 'string' && re.test(x)) : (typeof dv === 'string' && re.test(dv));
 const eqOrHas = (dv,v) => v instanceof RegExp ? reHit(v,dv) : (Array.isArray(dv) && !Array.isArray(v)) ? dv.some(x=>eq(x,v)) : eq(dv,v);
 const getPath = (o,p) => p.split('.').reduce((a,k)=> a==null ? undefined : a[k], o);
+// query paths step through arrays: "pharaohs.name" collects the name of every embedded pharaoh
+function getQ(o, p){
+  let cur = [o], multi = false;
+  for (const k of p.split('.')){
+    const next = [];
+    for (const c of cur){
+      if (c === null || typeof c !== 'object') continue;
+      if (Array.isArray(c) && !/^\d+$/.test(k)){ multi = true; c.forEach(e=>{ if (e && typeof e === 'object' && !Array.isArray(e) && e[k] !== undefined) next.push(e[k]); }); }
+      else if (c[k] !== undefined) next.push(c[k]);
+    }
+    cur = next;
+  }
+  if (!multi) return cur.length ? cur[0] : undefined;
+  return cur.length ? cur.flatMap(x=>Array.isArray(x) ? x : [x]) : undefined;
+}
 function setPath(o,p,val){ const ks = p.split('.'); let a = o; for (let i=0;i<ks.length-1;i++){ if (a[ks[i]] === null || typeof a[ks[i]] !== 'object') a[ks[i]] = {}; a = a[ks[i]]; } a[ks[ks.length-1]] = val; }
 function unsetPath(o,p){ const ks = p.split('.'); let a = o; for (let i=0;i<ks.length-1;i++){ a = a && a[ks[i]]; } if (a) delete a[ks[ks.length-1]]; }
 const isOpObj = v => isObj(v) && Object.keys(v).length > 0 && Object.keys(v).every(k=>k[0]==='$');
@@ -108,7 +123,7 @@ function match(doc, f){
       continue;
     }
     if (k[0] === '$') throw new ShellErr('MongoServerError', `unknown top level operator: ${k}`);
-    const dv = getPath(doc,k);
+    const dv = getQ(doc,k);
     if (isOpObj(v)){ if (!opsPass(v,dv)) return false; }
     else if (!eqOrHas(dv,v)) return false;
   }
@@ -324,6 +339,44 @@ function collApi(name){
     deleteMany(f){ return rec('deleteMany',[f], del(f,true)); },
     drop(){ const d = S.dbs[S.cur]; const had = !!(d && d.colls[name]); if (had) delete d.colls[name]; return rec('drop',[],had); },
     isCapped(){ const c = getColl(name,false); return rec('isCapped',[], !!(c && c.capped)); },
+    aggregate(pipeline){
+      need(pipeline,0,'Collection.aggregate');
+      if (!Array.isArray(pipeline)) throw new ShellErr('MongoInvalidArgumentError','Pipeline must be an array of stages: aggregate([ { $match: … }, … ])');
+      const c = getColl(name,false);
+      let docs = c ? c.docs.map(clone) : [];
+      pipeline.forEach(stage=>{
+        if (!isObj(stage) || Object.keys(stage).length !== 1) throw new ShellErr('MongoServerError','A pipeline stage specification object must contain exactly one field.');
+        const op = Object.keys(stage)[0], spec = stage[op];
+        switch(op){
+          case '$match': docs = docs.filter(d=>match(d,spec)); break;
+          case '$lookup': {
+            if (!isObj(spec) || ['from','localField','foreignField','as'].some(k=>typeof spec[k] !== 'string')) throw new ShellErr('MongoServerError','$lookup needs string fields: from, localField, foreignField, as');
+            const fc = (S.dbs[S.cur] && S.dbs[S.cur].colls[spec.from]) ? S.dbs[S.cur].colls[spec.from].docs : [];
+            docs.forEach(d=>{
+              const lv = getPath(d, spec.localField);
+              const vals = Array.isArray(lv) ? lv : [lv === undefined ? null : lv];
+              setPath(d, spec.as, fc.filter(f=>{ const fv = getPath(f, spec.foreignField); return vals.some(v=> v === null ? (fv === undefined || fv === null) : eqOrHas(fv, v)); }).map(clone));
+            });
+            break;
+          }
+          case '$unwind': {
+            const path = typeof spec === 'string' ? spec : (isObj(spec) && spec.path);
+            if (typeof path !== 'string' || path[0] !== '$') throw new ShellErr('MongoServerError','$unwind path must be a string starting with "$"');
+            const p = path.slice(1);
+            docs = docs.flatMap(d=>{ const v = getPath(d,p); return Array.isArray(v) ? v.map(x=>{ const o = clone(d); setPath(o,p,clone(x)); return o; }) : (v === undefined ? [] : [d]); });
+            break;
+          }
+          case '$project': docs = docs.map(d=>project(d,spec)); break;
+          case '$sort': docs = sortVals(docs, spec); break;
+          case '$limit': docs = docs.slice(0, spec); break;
+          case '$skip': docs = docs.slice(spec); break;
+          case '$count': docs = [{ [spec]: docs.length }]; break;
+          default: throw new ShellErr('MongoServerError', `Unrecognized pipeline stage name: '${op}'`);
+        }
+      });
+      rec('aggregate',[pipeline],docs);
+      return new Cursor(docs);
+    },
     getName(){ return name; },
     toString(){ return `${S.cur}.${name}`; }
   };
@@ -417,7 +470,7 @@ function execute(src){
         res.html = esc(dbApi.getCollectionNames().join('\n'));
       }
     } else if (/^help\s*;?$/.test(code)){
-      res.html = esc(['  Shell commands available in this lab:', '    use <db>            switch the current database', '    show dbs            list databases', '    show collections    list collections in the current db', '    db                  print the current database', '    cls                 clear the screen', '', '  Collection methods: insertOne, insertMany, find, findOne, countDocuments,', '    updateOne, updateMany, replaceOne, deleteOne, deleteMany, drop, isCapped', '  Database methods: createCollection, dropDatabase, getCollectionNames'].join('\n'));
+      res.html = esc(['  Shell commands available in this lab:', '    use <db>            switch the current database', '    show dbs            list databases', '    show collections    list collections in the current db', '    db                  print the current database', '    cls                 clear the screen', '', '  Collection methods: insertOne, insertMany, find, findOne, countDocuments,', '    updateOne, updateMany, replaceOne, deleteOne, deleteMany, aggregate, drop, isCapped', '  Database methods: createCollection, dropDatabase, getCollectionNames'].join('\n'));
     } else {
       res.value = evalJs(code);
       const v = res.value;

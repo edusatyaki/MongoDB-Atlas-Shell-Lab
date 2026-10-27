@@ -19,7 +19,7 @@ const UNIVERSE = [
   { name:'Cosmic Microwave Background', type:'Radiation', temperature_K:2.725 }
 ];
 
-const CH03_TASKS = [
+const CH02_TASKS = [
   /* ---------- STAGE 01.01 · Comparison ---------- */
   { group:'Comparison', kind:'find', ops:['$eq'], title:'Exactly Earth',
     story:'<b>Mission Control</b> has loaded <code>astronomy_data</code>: 12 objects, from the Sun to the Cosmic Microwave Background. Your universe is in the Data panel. <b>Stage 01.01</b> compares a field with a value.',
@@ -263,10 +263,10 @@ const CH03_TASKS = [
     const docs = UNIVERSE.map((d,i)=>prepDoc(Object.assign({ _id: new ObjectId('6650c0de' + (i+1).toString(16).padStart(16,'0')) }, d)));
     return { cur:'MissionMongo', dbs:{ MissionMongo:{ colls:{ astronomy_data:{ docs, capped:false } } } } };
   },
-  tasks: CH03_TASKS,
+  tasks: CH02_TASKS,
   finish: {
     tag: 'Chapter 02 complete', title: 'Mission completed',
-    text: `You ran all ${CH03_TASKS.length} query and update operators from Mission Mongo.`,
+    text: `You ran all ${CH02_TASKS.length} query and update operators from Mission Mongo.`,
     note: 'Comparison → Logical → Array → Regex → Field, Array, Positional and Date updates → Replace.'
   }
 });

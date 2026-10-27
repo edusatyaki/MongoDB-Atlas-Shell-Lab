@@ -12,6 +12,7 @@
   --side:300px; --top:60px;
 }
 body[data-chapter="ch02"]{ --story:#5B3FB0; --storybg:#F3F0FF; }
+body[data-chapter="ch03"]{ --story:#8A5A12; --storybg:#FBF3E2; }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--page);color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5}
